@@ -1,5 +1,5 @@
-#ifndef LOCATION_PROVIDER_H
-#define LOCATION_PROVIDER_H
+#ifndef _LOCATION_PROVIDER_H
+#define _LOCATION_PROVIDER_H
 
 class LocationProvider;
 
@@ -22,7 +22,6 @@ public:
 		return LocationCoordinates(getLatitude(), getLongtitude());
 	}
 };
-
 
 
 #endif

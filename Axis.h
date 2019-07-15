@@ -5,13 +5,13 @@
  *      Author: caoyuan9642
  */
 
-#ifndef PUSHTOGO_AXIS_H_
-#define PUSHTOGO_AXIS_H_
+#ifndef _AXIS_H_
+#define _AXIS_H_
 #include "StepperMotor.h"
 #include <math.h>
 #include "mbed.h"
 #include "CelestialMath.h"
-#include "TelescopeConfiguration.h"
+#include "config/TelescopeConfiguration.h"
 #include "PEC.h"
 
 //#define AXIS_SLEW_SIGNAL				0x00010000
@@ -453,5 +453,5 @@ protected:
 }
 ;
 
-#endif /* PUSHTOGO_AXIS_H_ */
+#endif /* _AXIS_H_ */
 

@@ -1,5 +1,5 @@
-#ifndef RTCCLOCK_H_
-#define RTCCLOCK_H_
+#ifndef _RTCCLOCK_H_
+#define _RTCCLOCK_H_
 
 #include "mbed.h"
 #include "UTCClock.h"
@@ -39,5 +39,5 @@ public:
 	}
 };
 
-#endif /*RTCCLOCK_H_*/
+#endif /*_RTCCLOCK_H_*/
 

@@ -8,7 +8,9 @@
 #ifndef TELESCOPE_SERIALDIGITALINPUT_H_
 #define TELESCOPE_SERIALDIGITALINPUT_H_
 
-#include "mbed.h"
+#include "DigitalOut.h"
+#include "DigitalIn.h"
+using namespace mbed;
 
 /**
  * A serial interfaced digital input

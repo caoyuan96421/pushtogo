@@ -5,9 +5,10 @@
  *      Author: caoyuan9642
  */
 
-#include <AMIS30543StepperDriver.h>
+#include "AMIS30543StepperDriver.h"
 #include "mbed.h"
 #include "pinmap.h"
+
 AMIS30543StepperDriver::AMIS30543StepperDriver(SPI *spi, PinName cs,
 		PinName step, PinName dir, PinName err, bool invert) :
 		StepperMotor(invert), spi(spi), cs(cs, 1), step(step), dir(dir), err(

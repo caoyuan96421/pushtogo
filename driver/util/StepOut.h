@@ -5,11 +5,18 @@
  *      Author: caoyuan9642
  */
 
-#ifndef TELESCOPE_STEPOUT_H_
-#define TELESCOPE_STEPOUT_H_
+#ifndef _STEPOUT_H_
+#define _STEPOUT_H_
 
-#include "mbed.h"
+#include "drivers/PwmOut.h"
+#include "drivers/Timer.h"
 
+using namespace mbed;
+
+/**
+ * General stepping output using PwmOut driver of MBED
+ * Can control frequency on the run, and obtain (approximate, but fairly accurate) step count for distance/angle measurement
+ */
 class StepOut: protected PwmOut
 {
 public:
@@ -48,6 +55,6 @@ private:
 
 };
 
-#endif /* TELESCOPE_STEPOUT_H_ */
+#endif /* _STEPOUT_H_ */
 
 

@@ -1,5 +1,5 @@
-#ifndef MOUNT_H_
-#define MOUNT_H_
+#ifndef _MOUNT_H_
+#define _MOUNT_H_
 
 typedef enum
 {
@@ -34,5 +34,5 @@ public:
 	}
 };
 
-#endif /*MOUNT_H_*/
+#endif /*_MOUNT_H_*/
 

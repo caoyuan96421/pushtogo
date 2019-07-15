@@ -5,8 +5,8 @@
  *      Author: Yuan
  */
 
-#ifndef CELESTIALMATH_H_
-#define CELESTIALMATH_H_
+#ifndef _CELESTIALMATH_H_
+#define _CELESTIALMATH_H_
 
 #include <time.h>
 #include <math.h>
@@ -269,5 +269,5 @@ double parseDMSAngle(char *dms);
 static double kingRate(EquatorialCoordinates eq, LocationCoordinates loc,
 		double time);
 
-#endif /* CELESTIALMATH_H_ */
+#endif /* _CELESTIALMATH_H_ */
 

@@ -1,5 +1,5 @@
-#ifndef EQUATORIALMOUNT_H_
-#define EQUATORIALMOUNT_H_
+#ifndef _EQUATORIALMOUNT_H_
+#define _EQUATORIALMOUNT_H_
 #include "Axis.h"
 #include "Mount.h"
 #include "UTCClock.h"
@@ -353,5 +353,5 @@ public:
 
 };
 
-#endif /*EQUATORIALMOUNT_H_*/
+#endif /*_EQUATORIALMOUNT_H_*/
 

@@ -5,8 +5,8 @@
  *      Author: caoyuan9642
  */
 
-#ifndef PUSHTOGO_TELESCOPECONFIGURATION_H_
-#define PUSHTOGO_TELESCOPECONFIGURATION_H_
+#ifndef _TELESCOPECONFIGURATION_H_
+#define _TELESCOPECONFIGURATION_H_
 
 #include <stdio.h>
 #include <string.h>

@@ -6,7 +6,7 @@
  */
 
 #include "LocationProvider.h"
-#include "TelescopeConfiguration.h"
+#include "config/TelescopeConfiguration.h"
 
 double LocationProvider::getLongtitude() const {
 	return TelescopeConfiguration::getDouble("longitude");

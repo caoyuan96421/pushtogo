@@ -5,14 +5,14 @@
  *      Author: caoyuan9642
  */
 
-#ifndef TELESCOPE_HARDWARE_H_
-#define TELESCOPE_HARDWARE_H_
+#ifndef _TELESCOPE_HARDWARE_H_
+#define _TELESCOPE_HARDWARE_H_
 
 #include "mbed.h"
 #include "EquatorialMount.h"
 
 /**
- * These functions must be implemented in a separate telescope_hardware.cpp, adapted to your specific hardware configuration
+ * These functions must be implemented in a user-provided telescope_hardware.cpp, adapted to your specific hardware configuration
  */
 
 EquatorialMount &telescopeHardwareInit();
@@ -21,7 +21,5 @@ osStatus telescopeServerInit();
 
 osStatus telescopeConfigurationWriteback();
 
-
-
-#endif /* TELESCOPE_HARDWARE_H_ */
+#endif /* _TELESCOPE_HARDWARE_H_ */
 

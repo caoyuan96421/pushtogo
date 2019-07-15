@@ -6,8 +6,8 @@
  *      Author: caoyuan9642
  */
 
-#include "mbed.h"
-#include <StepOut.h>
+#include <math.h>
+#include "StepOut.h"
 
 #define MAX_PERIOD 1000000LL
 

@@ -5,8 +5,8 @@
  *      Author: caoyu
  */
 
-#ifndef PUSHTOGO_PEC_H_
-#define PUSHTOGO_PEC_H_
+#ifndef _PEC_H_
+#define _PEC_H_
 #include "mbed.h"
 
 // Maximum correctable error per step, in arcsecond
@@ -73,4 +73,4 @@ protected:
 	void task();
 };
 
-#endif /* PUSHTOGO_PEC_H_ */
+#endif /* _PEC_H_ */

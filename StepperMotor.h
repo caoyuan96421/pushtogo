@@ -5,8 +5,8 @@
  *      Author: caoyuan9642
  */
 
-#ifndef TELESCOPE_STEPPERMOTOR_H_
-#define TELESCOPE_STEPPERMOTOR_H_
+#ifndef _STEPPERMOTOR_H_
+#define _STEPPERMOTOR_H_
 
 #include <stdint.h>
 

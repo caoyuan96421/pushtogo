@@ -5,8 +5,8 @@
  *      Author: caoyuan9642
  */
 
-#ifndef MOUNTSERVER_H_
-#define MOUNTSERVER_H_
+#ifndef _MOUNTSERVER_H_
+#define _MOUNTSERVER_H_
 
 class MountServer
 {
@@ -18,5 +18,5 @@ public:
 	}
 };
 
-#endif /* MOUNTSERVER_H_ */
+#endif /* _MOUNTSERVER_H_ */
 

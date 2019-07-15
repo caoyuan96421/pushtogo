@@ -7,8 +7,8 @@
  *      Author: caoyuan9642
  */
 
-#ifndef TELESCOPE_ABSENCODER_H_
-#define TELESCOPE_ABSENCODER_H_
+#ifndef _ABSENCODER_H_
+#define _ABSENCODER_H_
 
 #include <stdint.h>
 /**
@@ -34,6 +34,6 @@ public:
 	}
 };
 
-#endif /* TELESCOPE_ABSENCODER_H_ */
+#endif /* _ABSENCODER_H_ */
 
 

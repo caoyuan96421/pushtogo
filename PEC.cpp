@@ -7,7 +7,7 @@
 
 #include "PEC.h"
 #include "Axis.h"
-#include "TelescopeConfiguration.h"
+#include "config/TelescopeConfiguration.h"
 #include <math.h>
 
 PEC::PEC(Axis &a) :

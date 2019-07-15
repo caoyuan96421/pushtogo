@@ -5,7 +5,7 @@
  *      Author: caoyuan9642
  */
 
-#include <TelescopeConfiguration.h>
+#include "TelescopeConfiguration.h"
 #include "mbed.h"
 #include <stdio.h>
 #include <ctype.h>

@@ -5,8 +5,8 @@
  *      Author: caoyuan9642
  */
 
-#ifndef EQMOUNTSERVER_H_
-#define EQMOUNTSERVER_H_
+#ifndef _EQMOUNTSERVER_H_
+#define _EQMOUNTSERVER_H_
 
 #include "MountServer.h"
 #include "EquatorialMount.h"
@@ -84,5 +84,5 @@ public:
  */
 void stprintf(FileHandle &f, const char *fmt, ...);
 
-#endif /* EQMOUNTSERVER_H_ */
+#endif /* _EQMOUNTSERVER_H_ */
 

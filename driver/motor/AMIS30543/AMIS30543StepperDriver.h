@@ -5,13 +5,14 @@
  *      Author: caoyuan9642
  */
 
-#ifndef TELESCOPE_DRIVER_AMIS30543STEPPERDRIVER_H_
+#ifndef _AMIS30543STEPPERDRIVER_H_
 
-#define TELESCOPE_DRIVER_AMIS30543STEPPERDRIVER_H_
+#define _AMIS30543STEPPERDRIVER_H_
 
-#include <StepperMotor.h>
-#include <StepOut.h>
-#include "mbed.h"
+#include "StepperMotor.h"
+#include "driver/util/StepOut.h"
+#include "DigitalIn.h"
+#include "SPI.h"
 
 class AMIS30543StepperDriver: public StepperMotor
 {
@@ -82,6 +83,6 @@ protected:
 	uint8_t readReg(regaddr_t addr);
 };
 
-#endif /* TELESCOPE_DRIVER_AMIS30543STEPPERDRIVER_H_ */
+#endif /* _AMIS30543STEPPERDRIVER_H_ */
 
 
