@@ -30,7 +30,7 @@ void PEC::task() {
 	while (true) {
 		if (enabled) {
 			double degTeeth = 360.0
-					/ TelescopeConfiguration::getDouble("worm_teeth"); // Degree per teeth
+					/ TelescopeConfiguration::getInt("worm_teeth"); // Degree per teeth
 			double period = degTeeth
 					/ (axis.getTrackSpeedSidereal() * sidereal_speed); // Worm rotation period
 

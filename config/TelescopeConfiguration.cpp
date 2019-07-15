@@ -33,112 +33,44 @@ static const char *typeName(DataType type) {
 }
 
 static const ConfigItem default_config[] =
-		{ { .config = "latitude", .name = "Your latitude", .help =
-				"Latitude of observer, in degrees north of equator.", .type =
-				DATATYPE_DOUBLE, .value = { .ddata = 42 }, .min =
-				{ .ddata = -90 }, .max = { .ddata = 90 } }, { .config =
-				"longitude", .name = "Your longitude", .help =
-				"Longitude of observer, in degrees east of Greenwich.", .type =
-				DATATYPE_DOUBLE, .value = { .ddata = -73 }, .min = { .ddata =
-				-180 }, .max = { .ddata = 180 } }, { .config = "timezone",
-				.name = "Your timezone", .help =
-						"Timezone in hours ahead of UTC time.", .type =
-						DATATYPE_INT, .value = { .idata = -4 }, .min = {
-						.idata = -12 }, .max = { .idata = 12 } },
-				{ .config = "motor_steps", .name = "Steps per Revolution",
-						.help =
-								"Motor steps/revolution.\nIf you hard-programed the microstepping, here should use total microstep resolution.",
-						.type = DATATYPE_INT, .value = { .idata = 400 }, .min =
-								{ .idata = 1 }, .max = { .idata = 1000000 } }, {
-						.config = "gear_reduction", .name = "Gear Ratio",
-						.help = "Gearbox reduction ratio. ", .type =
-								DATATYPE_DOUBLE, .value = { .ddata = 1 }, .min =
-								{ .ddata = 0 }, .max = { .ddata = 10000 } }, {
-						.config = "worm_teeth", .name = "Worm Teeth", .help =
-								"Number of teeth on the ring gear.", .type =
-								DATATYPE_INT, .value = { .idata = 180 }, .min =
-								{ .idata = 1 }, .max = { .idata = 10000 } },
-				{ .config = "ra_invert", .name = "Invert RA direction",
-						.help =
-								"Invert RA driving direction?\n Save and restart to take effect",
-						.type = DATATYPE_BOOL, .value = { .bdata = false } },
-				{ .config = "dec_invert", .name = "Invert DEC direction",
-						.help =
-								"Invert DEC driving direction?\n Save and restart to take effect",
-						.type = DATATYPE_BOOL, .value = { .bdata = false } }, {
-						.config = "default_slew_speed", .name =
-								"Default slew speed", .help =
-								"Default slewing speed in deg/s", .type =
-								DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min =
-								{ .ddata = 1 }, .max = { .ddata = 10 } }, {
-						.config = "goto_slew_speed", .name =
-								"Goto slew speed", .help =
-								"Slewing speed used for goto, in deg/s", .type =
-								DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min =
-								{ .ddata = 1 }, .max = { .ddata = 10 } },
-				{ .config = "default_track_speed_sidereal", .name =
-						"Default track speed", .help =
-						"Default slewing speed in multiple of sidereal rate.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 1 }, .min =
-								{ .ddata = 0 }, .max = { .ddata = 100 } },
-				{ .config = "correction_speed_sidereal", .name =
-						"Default correction speed", .help =
-						"Correction speed in multiple of sidereal rate.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 32 },
-						.min = { .ddata = 0 }, .max = { .ddata = 100 } },
-				{ .config = "default_guide_speed_sidereal", .name =
-						"Default guiding speed", .help =
-						"Default guiding speed in multiple of sidereal rate.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 0.5 },
-						.min = { .ddata = 0 }, .max = { .ddata = 100 } }, {
-						.config = "acceleration", .name = "Acceleration",
-						.help = "Acceleration in deg/s^2.", .type =
-								DATATYPE_DOUBLE, .value = { .ddata = 2 }, .min =
-								{ .ddata = 0.01 }, .max = { .ddata = 1000 } },
-				{ .config = "max_speed", .name = "Max slewing speed", .help =
-						"Max slewing speed. Reduce this value if losing steps.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min =
-								{ .ddata = 1 }, .max = { .ddata = 100 } },
-				{ .config = "min_slew_angle", .name = "Min slewing distance",
-						.help =
-								"Min slew angle, in deg. Angle difference below this value will be approached by correction alone.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 0.3 },
-						.min = { .ddata = 0.001 }, .max = { .ddata = 10 } }, {
-						.config = "correction_tolerance", .name =
-								"Correction Tolerance", .help =
-								"Correction tolerance in deg", .type =
-								DATATYPE_DOUBLE, .value = { .ddata = 0.03 },
-						.min = { .ddata = 0.001 }, .max = { .ddata = 1 } },
-				{ .config = "min_correction_time",
-						.name = "Min Correction Time",
-						.help =
-								"Minimum correction time in milliseconds. Corrections less than this will be ignored.",
-						.type = DATATYPE_INT, .value = { .idata = 5 }, .min = {
-								.idata = 1 }, .max = { .idata = 1000 } },
-				{ .config = "max_correction_angle", .name =
-						"Max Correction Angle",
-						.help =
-								"Max correction angle in deg. Corrections larger than this value will still be executed, but give you a warning since it will take a long time and something is likely wrong.",
-						.type = DATATYPE_DOUBLE, .value = { .ddata = 5 }, .min =
-								{ .ddata = 0 }, .max = { .ddata = 180 } },
-				{ .config = "max_guide_time", .name = "Max Guiding Time",
-						.help =
-								"Max guide time in milliseconds. Guide pulses larger than this value will be truncated.",
-						.type = DATATYPE_INT, .value = { .idata = 5000 }, .min =
-								{ .idata = 100 }, .max = { .idata = 10000000 } },
-				{ .config = "acceleration_step_time", .name =
-						"Acceleration Step Time",
-						.help =
-								"Acceleration step time in milliseconds. The default value should work for most situations.",
-						.type = DATATYPE_INT, .value = { .idata = 5 }, .min = {
-								.idata = 1 }, .max = { .idata = 1000 } },
-				{ .config = "pec_granularity", .name =
-						"PEC Granularity",
-						.help =
-								"Number of PEC slots per revolution of the worm",
-						.type = DATATYPE_INT, .value = { .idata = 512 }, .min = {
-								.idata = 32 }, .max = { .idata = 16384} }, {
-						.config = "" } };
+		{
+			{.config = "latitude", .name = "Your latitude", .help =	"Latitude of observer, in degrees north of equator.",
+			.type =	DATATYPE_DOUBLE, .value = { .ddata =0 }, .min = { .ddata = -90 }, .max = { .ddata = 90 } },
+
+			{.config =	"longitude", .name = "Your longitude", .help =	"Longitude of observer, in degrees east of Greenwich.",
+			.type =	DATATYPE_DOUBLE, .value = { .ddata = 0 }, .min = { .ddata = -180 }, .max = { .ddata = 180 } },
+
+			{.config = "timezone",	.name = "Your timezone", .help = "Timezone in hours ahead of UTC time.",
+			.type =	DATATYPE_INT, .value = { .idata = 0 }, .min = {.idata = -12 }, .max = { .idata = 12 } },
+
+			{.config = "motor_steps", .name = "Steps per Revolution",	.help =	"Motor steps/revolution.\nIf you hard-programed the microstepping, here should use total microstep resolution.",
+			.type = DATATYPE_INT, .value = { .idata = 400 }, .min =	{ .idata = 1 }, .max = { .idata = 1000000 } },
+
+			{.config = "gear_reduction", .name = "Gear Ratio",	.help = "Gearbox reduction ratio. ",
+			.type = DATATYPE_DOUBLE, .value = { .ddata = 1 }, .min = { .ddata = 0 }, .max = { .ddata = 10000 } },
+
+			{.config = "worm_teeth", .name = "Worm Teeth", .help =	"Number of teeth on the ring gear.",
+			.type =	DATATYPE_INT, .value = { .idata = 180 }, .min =	{ .idata = 1 }, .max = { .idata = 10000 } },
+
+			{.config = "ra_invert", .name = "Invert RA direction", .help =	"Invert RA driving direction?\n Save and restart to take effect",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
+
+			{ .config = "dec_invert", .name = "Invert DEC direction", .help = "Invert DEC driving direction?\n Save and restart to take effect",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
+
+			{.config = "goto_slew_speed", .name = "Goto slew speed", .help = "Slewing speed used for goto, in deg/s",
+			.type =	DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min = { .ddata = 1 }, .max = { .ddata = 10 } },
+
+			{ .config = "acceleration", .name = "Acceleration",	.help = "Acceleration in deg/s^2.",
+			.type =	DATATYPE_DOUBLE, .value = { .ddata = 2 }, .min = { .ddata = 0.01 }, .max = { .ddata = 1000 } },
+
+			{ .config = "max_speed", .name = "Max slewing speed", .help = "Max slewing speed. Reduce this value if losing steps.",
+			.type = DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min = { .ddata = 1 }, .max = { .ddata = 100 } },
+
+			{ .config = "pec_granularity", .name = "PEC Granularity", .help = "Number of PEC slots per revolution of the worm",
+			.type = DATATYPE_INT, .value = { .idata = 512 }, .min = {.idata = 32 }, .max = { .idata = 16384} },
+
+			{.config = "" } };
 
 int TelescopeConfiguration::eqmount_config(EqMountServer *server,
 		const char *cmd, int argn, char *argv[]) {

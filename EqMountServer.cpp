@@ -658,8 +658,7 @@ static int eqmount_guide(EqMountServer *server, const char *cmd, int argn,
 
 	char *tp;
 	int ms = strtod(argv[1], &tp);
-	if (tp == argv[1] || ms < 1
-			|| ms > TelescopeConfiguration::getInt("max_guide_time")) {
+	if (tp == argv[1] || ms < 1 || ms > MBED_CONF_PUSHTOGO_MAX_GUIDE_TIME) {
 		return ERR_PARAM_OUT_OF_RANGE;
 	}
 

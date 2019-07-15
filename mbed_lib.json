@@ -1,0 +1,45 @@
+{
+    "name": "pushtogo",
+    "config": {
+        "default_slew_speed": {
+            "help": "Default slewing speed in deg/s", 
+            "value": "4.0"
+        },
+        "default_track_speed_sidereal": {
+            "help": "Default slewing speed in multiple of sidereal rate.",
+            "value": "1.0"
+        },
+        "default_guide_speed_sidereal": {
+            "help": "Default guiding speed in multiple of sidereal rate.",
+            "value": "0.5"
+        },
+        "correction_speed_sidereal": {
+            "help": "Default correction speed in multiple of sidereal rate.",
+            "value": "32.0"
+        },
+        "min_slew_angle": {
+            "help": "Min slew angle, in deg. Angle difference below this value will be approached by correction alone.",
+            "value": "0.3"
+        },
+        "correction_tolerance": {
+            "help": "Correction tolerance in deg",
+            "value": "0.03"
+        },
+        "min_correction_time": {
+            "help": "Minimum correction time in milliseconds. Corrections less than this will be ignored.",
+            "value": 5
+        },
+        "max_correction_angle": {
+            "help": "Max correction angle in deg. Corrections larger than this value will still be executed, but give you a warning since it will take a long time and something is likely wrong.",
+            "value": 5
+        },
+        "max_guide_time": {
+            "help": "Maximum guiding time in milliseconds. Guide pulses larger than this value will be truncated.",
+            "value": 5000
+        },
+        "acceleration_step_time": {
+            "help": "Acceleration step time in milliseconds. The default value should work for most situations.",
+            "value": 5
+        }
+    }
+}
