@@ -54,7 +54,7 @@ osStatus EquatorialMount::goTo(EquatorialCoordinates dest) {
 }
 
 osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
-bool withCorrection) {
+		bool withCorrection) {
 	mutex_execution.lock();
 	bool was_tracking = false;
 	if ((status & MOUNT_TRACKING) && !(status & MOUNT_NUDGING)) {
@@ -349,9 +349,9 @@ osStatus EquatorialMount::recalibrate() {
 	if (num_alignment_stars == 0) {
 		return osOK;
 	}
-	EqCalibration newcalib = CelestialMath::align(num_alignment_stars,
-			alignment_stars, loc.getLocation(), diverge);
-	if (diverge) {
+	EqCalibration newcalib = alignAuto(num_alignment_stars, alignment_stars,
+			loc.getLocation());
+	if (isinf(newcalib.error)) {
 		return osErrorParameter;
 	}
 
@@ -402,10 +402,8 @@ void EquatorialMount::setSlewSpeed(double rate) {
 
 			curr_dir = ra.getCurrentDirection(); // Current direction
 
-
 			double trackSpeed = ra.getTrackSpeedSidereal() * sidereal_speed;
 			double absSpeed = nudgeSpeed;
-
 
 			if (ra_dir == AXIS_ROTATE_POSITIVE) {
 				// Same direction as tracking
@@ -415,8 +413,8 @@ void EquatorialMount::setSlewSpeed(double rate) {
 												  // Partially canceling the tracking speed
 				absSpeed = trackSpeed - nudgeSpeed;
 				ra_dir = AXIS_ROTATE_POSITIVE; // Rotate in the tracking direction
-			} else if (nudgeSpeed > trackSpeed) {// ra_dir == AXIS_ROTATE_NEGATIVE
-												 // Direction inverted
+			} else if (nudgeSpeed > trackSpeed) { // ra_dir == AXIS_ROTATE_NEGATIVE
+												  // Direction inverted
 				absSpeed = nudgeSpeed - trackSpeed;
 				ra_dir = AXIS_ROTATE_NEGATIVE; // Invert the rotation
 			} else { // nudgeSpeed == trackSpeed

@@ -208,17 +208,12 @@ public:
 	 */
 	MountCoordinates convertToMountCoordinates(
 			const EquatorialCoordinates &eq) {
-		LocalEquatorialCoordinates leq =
-				CelestialMath::equatorialToLocalEquatorial(eq, clock.getTimeHighResolution(),
-						loc.getLocation());
-		// Apply PA misalignment
-		leq = CelestialMath::applyMisalignment(leq, calibration.pa,
-				loc.getLocation());
-		// Apply Cone error
-		leq = CelestialMath::applyConeError(leq, calibration.cone);
-		// Convert to Mount coordinates. Automatically determine the pier side, then apply offset
-		return CelestialMath::localEquatorialToMount(leq, PIER_SIDE_AUTO)
-				+ calibration.offset;
+
+		LocationCoordinates l = loc.getLocation();
+		double timestamp = clock.getTimeHighResolution();
+		return eq.toLocalEquatorialCoordinates(timestamp, l).applyPolarMisalignment(
+				calibration.pa, l).applyConeError(calibration.cone).toMountCoordinates(
+				PIER_SIDE_AUTO) + calibration.offset;
 	}
 
 	/**
@@ -227,12 +222,11 @@ public:
 	 * @return EQ coordinates
 	 */
 	EquatorialCoordinates convertToEqCoordinates(const MountCoordinates &mc) {
-		LocalEquatorialCoordinates leq = CelestialMath::mountToLocalEquatorial(
-				mc - calibration.offset);
-		leq = CelestialMath::deapplyConeError(leq, calibration.cone);
-		leq = CelestialMath::deapplyMisalignment(leq, calibration.pa, loc.getLocation());
-		return CelestialMath::localEquatorialToEquatorial(leq, clock.getTimeHighResolution(),
-				loc.getLocation());
+		LocationCoordinates l = loc.getLocation();
+		double timestamp = clock.getTimeHighResolution();
+		return (mc - calibration.offset).toLocalEquatorialCoordinates().deapplyConeError(
+				calibration.cone).deapplyPolarMisalignment(calibration.pa, l).toEquatorial(
+				timestamp, l);
 	}
 
 	/**
