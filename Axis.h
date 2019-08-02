@@ -98,8 +98,8 @@ public:
 		message->withCorrection = withCorrection;
 		osStatus s;
 
-		debug_if(0, "%s: CLR SLEW 0x%08x\n", axisName, Thread::gettid());
-		slew_finish_sem.wait(0); // Make sure the semaphore is cleared. THIS MUST BE DONE BEFORE THE MESSAGE IS ENQUEUED
+		debug_if(0, "%s: CLR SLEW 0x%08x\n", axisName, ThisThread::get_id());
+		slew_finish_sem.try_acquire(); // Make sure the semaphore is cleared. THIS MUST BE DONE BEFORE THE MESSAGE IS ENQUEUED
 
 		if ((s = task_queue.put(message)) != osOK)
 		{
@@ -116,12 +116,8 @@ public:
 	 */
 	finishstate_t waitForSlew()
 	{
-		debug_if(0, "%s: WAIT SLEW 0x%08x\n", axisName, Thread::gettid());
-		if (slew_finish_sem.wait() <= 0)
-		{
-			return FINISH_ERROR;
-		}
-
+		debug_if(0, "%s: WAIT SLEW 0x%08x\n", axisName, ThisThread::get_id());
+		slew_finish_sem.acquire();
 		// Check mount status
 		return slew_finish_state;
 	}
@@ -207,7 +203,7 @@ public:
 		{
 			return s;
 		}
-		task_thread->signal_set(AXIS_GUIDE_SIGNAL); // Signal the task thread to read the queue
+		task_thread->flags_set(AXIS_GUIDE_SIGNAL); // Signal the task thread to read the queue
 		return osOK;
 	}
 
@@ -234,7 +230,7 @@ public:
 	void stop()
 	{
 		flushCommandQueue();
-		task_thread->signal_set(AXIS_STOP_SIGNAL);
+		task_thread->flags_set(AXIS_STOP_SIGNAL);
 	}
 
 	/**
@@ -244,7 +240,7 @@ public:
 	void emergency_stop()
 	{
 		flushCommandQueue();
-		task_thread->signal_set(AXIS_EMERGE_STOP_SIGNAL);
+		task_thread->flags_set(AXIS_EMERGE_STOP_SIGNAL);
 	}
 
 	/**
@@ -253,7 +249,7 @@ public:
 	 */
 	void stopKeepSpeed()
 	{
-		task_thread->signal_set(AXIS_STOP_KEEPSPEED_SIGNAL);
+		task_thread->flags_set(AXIS_STOP_KEEPSPEED_SIGNAL);
 	}
 
 	/** Set current angle of the axis in degrees.
@@ -297,7 +293,7 @@ public:
 		if (slewSpeed > 0)
 			this->slewSpeed = slewSpeed;
 
-		task_thread->signal_set(AXIS_SPEEDCHANGE_SIGNAL); // Signal the thread to use the new speed during a indefinite slew
+		task_thread->flags_set(AXIS_SPEEDCHANGE_SIGNAL); // Signal the thread to use the new speed during a indefinite slew
 	}
 
 	/**
@@ -450,6 +446,9 @@ protected:
 	virtual void idle_mode()
 	{
 	}
+
+	/// Stop the mount in case of error
+	virtual void err_cb();
 }
 ;
 

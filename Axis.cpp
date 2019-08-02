@@ -7,7 +7,7 @@
 
 #include <Axis.h>
 
-#define AXIS_DEBUG 0
+#define AXIS_DEBUG 1
 
 static inline double min(double x, double y) {
 	return (x < y) ? x : y;
@@ -15,9 +15,9 @@ static inline double min(double x, double y) {
 Axis::Axis(double stepsPerDeg, StepperMotor *stepper, const char *name) :
 		stepsPerDeg(stepsPerDeg), stepper(stepper), axisName(name), currentSpeed(
 				0), currentDirection(AXIS_ROTATE_POSITIVE), slewSpeed(
-						MBED_CONF_PUSHTOGO_DEFAULT_SLEW_SPEED), trackSpeed(
-								MBED_CONF_PUSHTOGO_DEFAULT_TRACK_SPEED_SIDEREAL * sidereal_speed), guideSpeed(
-										MBED_CONF_PUSHTOGO_DEFAULT_GUIDE_SPEED_SIDEREAL * sidereal_speed), status(
+		MBED_CONF_PUSHTOGO_DEFAULT_SLEW_SPEED), trackSpeed(
+		MBED_CONF_PUSHTOGO_DEFAULT_TRACK_SPEED_SIDEREAL * sidereal_speed), guideSpeed(
+		MBED_CONF_PUSHTOGO_DEFAULT_GUIDE_SPEED_SIDEREAL * sidereal_speed), status(
 				AXIS_STOPPED), slewState(AXIS_NOT_SLEWING), slew_finish_sem(0,
 				1), slew_finish_state(FINISH_COMPLETE), guiding(false), pec(
 		NULL), pecEnabled(false) {
@@ -35,6 +35,8 @@ Axis::Axis(double stepsPerDeg, StepperMotor *stepper, const char *name) :
 	OS_STACK_SIZE, NULL, taskName);
 	task_thread->start(callback(this, &Axis::task));
 	tim.start();
+	// Register error callback
+	stepper->setErrorCallback(callback(this, &Axis::err_cb));
 }
 
 Axis::~Axis() {
@@ -42,7 +44,7 @@ Axis::~Axis() {
 	if (status != AXIS_STOPPED) {
 		stop();
 		while (status != AXIS_STOPPED) {
-			Thread::wait(100);
+			ThisThread::sleep_for(100);
 		}
 	}
 
@@ -127,7 +129,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 	}
 
 	slew_mode(); // Switch to slew mode
-	Thread::signal_clr(
+	ThisThread::flags_clear(
 	AXIS_STOP_SIGNAL | AXIS_EMERGE_STOP_SIGNAL | AXIS_SPEEDCHANGE_SIGNAL); // Clear flags
 	bool isInertial = (status == AXIS_INERTIAL);
 	status = AXIS_SLEWING;
@@ -159,8 +161,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		// Ensure that delta is more than the minimum slewing angle, calculate the correct endSpeed and waitTime
 		if (delta > MBED_CONF_PUSHTOGO_MIN_SLEW_ANGLE) {
 			/*The motion angle is decreased to ensure the correction step is in the same direction*/
-			delta = delta
-					- 0.5 * MBED_CONF_PUSHTOGO_MIN_SLEW_ANGLE;
+			delta = delta - 0.5 * MBED_CONF_PUSHTOGO_MIN_SLEW_ANGLE;
 
 			double angleRotatedDuringAcceleration;
 
@@ -261,7 +262,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 
 		tim.reset();
 
-		while (wait_ms) {
+		while (isinf(waitTime) || wait_ms > 0) {
 			flags = osThreadFlagsWait(
 					AXIS_STOP_SIGNAL | AXIS_EMERGE_STOP_SIGNAL
 							| (indefinite ? AXIS_SPEEDCHANGE_SIGNAL : 0),
@@ -460,7 +461,7 @@ void Axis::track(axisrotdir_t dir) {
 		currentDirection = AXIS_ROTATE_POSITIVE;
 	}
 	status = AXIS_TRACKING;
-	Thread::signal_clr(
+	ThisThread::flags_clear(
 	AXIS_STOP_SIGNAL | AXIS_EMERGE_STOP_SIGNAL | AXIS_GUIDE_SIGNAL);
 	// Empty the guide queue
 	while (!guide_queue.empty())
@@ -576,3 +577,7 @@ void Axis::track(axisrotdir_t dir) {
 	idle_mode();
 }
 
+void Axis::err_cb() {
+	debug_if(AXIS_DEBUG, "%s: stopped on error\n", axisName);
+	emergency_stop();
+}

@@ -9,6 +9,7 @@
 #define _STEPPERMOTOR_H_
 
 #include <stdint.h>
+#include "Callback.h"
 
 typedef enum
 {
@@ -64,15 +65,21 @@ public:
 	virtual double setFrequency(double freq) = 0;
 
 	/**
+	 * Get frequency of the stepping. In unit of full steps per second
+	 * @return Actual frequency the stepper motor is running
+	 */
+	virtual double getFrequency() = 0;
+
+	/**
 	 * Turn off the motor power
 	 */
-	virtual void poweroff(){
+	virtual void powerOff(){
 	}
 
 	/**
 	 * Turn on the motor power
 	 */
-	virtual void poweron(){
+	virtual void powerOn(){
 	}
 
 	/**
@@ -91,6 +98,13 @@ public:
 	 */
 	virtual void setCurrent(double current)
 	{
+	}
+
+	/**
+	 * Set error callback
+	 * @param Callback to call when error occurs
+	 */
+	virtual void setErrorCallback(mbed::Callback<void()> cb){
 	}
 
 };

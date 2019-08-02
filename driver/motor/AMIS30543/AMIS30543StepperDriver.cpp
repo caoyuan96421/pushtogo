@@ -122,7 +122,11 @@ void AMIS30543StepperDriver::stop()
 double AMIS30543StepperDriver::setFrequency(double frequency)
 {
 	return step.setFrequency(frequency * microstep) / microstep; //Use the microstepping frequency
+}
 
+double AMIS30543StepperDriver::getFrequency()
+{
+	return step.getFrequency() / microstep; //Use the microstepping frequency
 }
 
 double AMIS30543StepperDriver::getStepCount()

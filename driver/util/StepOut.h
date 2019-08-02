@@ -22,11 +22,11 @@ class StepOut: protected PwmOut
 public:
 
 	StepOut(PinName pin) :
-			PwmOut(pin), stepCount(0), freq(1), status(IDLE)
+			PwmOut(pin), stepCount(0), freq(1000000), status(IDLE)
 	{
 		// Stop the output
-		this->period(1);
-		this->write(0);
+		output_off();
+		this->write(0.5f); // Keep DC
 		tim.start();
 	}
 	virtual ~StepOut()
@@ -39,6 +39,8 @@ public:
 	void stop();
 
 	double setFrequency(double frequency);
+	double getFrequency();
+
 	void resetCount();
 	int64_t getCount();
 
@@ -53,6 +55,8 @@ private:
 	stepstatus_t status;
 	Timer tim;
 
+	void output_on();
+	void output_off();
 };
 
 #endif /* _STEPOUT_H_ */

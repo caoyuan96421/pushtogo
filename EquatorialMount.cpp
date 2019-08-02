@@ -338,20 +338,19 @@ void EquatorialMount::stopSync() {
 	while (ra.getStatus() != AXIS_STOPPED || dec.getStatus() != AXIS_STOPPED) {
 		ra.stop();
 		dec.stop();
-		Thread::yield();
+		ThisThread::yield();
 	}
 	status = MOUNT_STOPPED;
 }
 
 osStatus EquatorialMount::recalibrate() {
-	bool diverge = false;
 
 	if (num_alignment_stars == 0) {
 		return osOK;
 	}
 	EqCalibration newcalib = alignAuto(num_alignment_stars, alignment_stars,
 			loc.getLocation());
-	if (isinf(newcalib.error)) {
+	if (newcalib.error > 100.0) {
 		return osErrorParameter;
 	}
 

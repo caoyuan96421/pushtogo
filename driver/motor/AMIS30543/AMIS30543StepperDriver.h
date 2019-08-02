@@ -28,6 +28,8 @@ public:
 
 	double setFrequency(double freq);
 
+	double getFrequency();
+
 	double getStepCount();
 
 	void setStepCount(double set)
