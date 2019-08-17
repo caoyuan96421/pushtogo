@@ -7,12 +7,12 @@
 
 #ifndef _AXIS_H_
 #define _AXIS_H_
-#include "StepperMotor.h"
-#include <math.h>
 #include "mbed.h"
+#include "StepperMotor.h"
 #include "CelestialMath.h"
-#include "config/TelescopeConfiguration.h"
 #include "PEC.h"
+#include "Encoder.h"
+#include "config/TelescopeConfiguration.h"
 
 //#define AXIS_SLEW_SIGNAL				0x00010000
 #define AXIS_GUIDE_SIGNAL				0x00020000
@@ -24,13 +24,11 @@
 /**
  * status of the Axis object
  */
-typedef enum
-{
+typedef enum {
 	AXIS_STOPPED = 0, AXIS_SLEWING, AXIS_TRACKING, AXIS_INERTIAL
 } axisstatus_t;
 
-typedef enum
-{
+typedef enum {
 	AXIS_NOT_SLEWING,
 	AXIS_SLEW_ACCELERATING,
 	AXIS_SLEW_CONSTANT_SPEED,
@@ -41,13 +39,11 @@ typedef enum
  * AXIS_ROTATE_POSITIVE: +angle
  * AXIS_ROTATE_NEGATIVE: -angle
  */
-typedef enum
-{
+typedef enum {
 	AXIS_ROTATE_STOP = 0, AXIS_ROTATE_POSITIVE = 1, AXIS_ROTATE_NEGATIVE = 2
 } axisrotdir_t;
 
-typedef enum
-{
+typedef enum {
 	FINISH_COMPLETE = 0,
 	FINISH_STOPPED = 1,
 	FINISH_EMERG_STOPPED = 2,
@@ -60,8 +56,7 @@ class PEC;
  * Handles low-level stepper timing, calculates the speed and distance to rotate
  * API provides comprehensive slewing, tracking and guiding.
  */
-class Axis
-{
+class Axis {
 public:
 
 	/**
@@ -70,7 +65,8 @@ public:
 	 * @param stepper Pointer to stepper driver to use
 	 * @param name Name of the axis, for example "RA" or "DEC"
 	 */
-	Axis(double stepsPerDeg, StepperMotor *stepper, const char *name = "Axis");
+	Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder =
+	NULL, const char *name = "Axis");
 
 	virtual ~Axis();
 
@@ -85,42 +81,13 @@ public:
 	 * @return osStatus
 	 */
 	osStatus startSlewTo(axisrotdir_t dir, double angle, bool withCorrection =
-	true)
-	{
-		msg_t *message = task_pool.alloc();
-		if (!message)
-		{
-			return osErrorNoMemory;
-		}
-		message->signal = msg_t::SIGNAL_SLEW_TO;
-		message->value = angle;
-		message->dir = dir;
-		message->withCorrection = withCorrection;
-		osStatus s;
-
-		debug_if(0, "%s: CLR SLEW 0x%08x\n", axisName, ThisThread::get_id());
-		slew_finish_sem.try_acquire(); // Make sure the semaphore is cleared. THIS MUST BE DONE BEFORE THE MESSAGE IS ENQUEUED
-
-		if ((s = task_queue.put(message)) != osOK)
-		{
-			task_pool.free(message);
-			return s;
-		}
-
-		return osOK;
-	}
+			true);
 
 	/**
 	 * Wait for a slew to finish. Must be called after and only once after a call to startSlewTo, from the same thread
 	 * @return Finish state of the slew, signaling whether there are errors or being stopped/emergency stopped
 	 */
-	finishstate_t waitForSlew()
-	{
-		debug_if(0, "%s: WAIT SLEW 0x%08x\n", axisName, ThisThread::get_id());
-		slew_finish_sem.acquire();
-		// Check mount status
-		return slew_finish_state;
-	}
+	finishstate_t waitForSlew();
 
 	/** 
 	 * Synchronously perform a goto to a specified angle (in degrees) in the specified direction with slewing rate
@@ -130,272 +97,144 @@ public:
 	 * @return osStatus
 	 * @sa{startSlewTo}
 	 */
-	osStatus slewTo(axisrotdir_t dir, double angle)
-	{
-		osStatus s;
-		if ((s = startSlewTo(dir, angle)) != osOK)
-			return s;
-		return waitForSlew();
-	}
+	osStatus slewTo(axisrotdir_t dir, double angle);
 
 	/** Perform a indefinite slewing, until stop() is called
 	 * @param dir Direction to start continuous slewing
 	 * @return osStatus
 	 * @sa{stop}
 	 */
-	osStatus startSlewingIndefinite(axisrotdir_t dir)
-	{
-		msg_t *message = task_pool.alloc();
-		if (!message)
-		{
-			return osErrorNoMemory;
-		}
-		message->signal = msg_t::SIGNAL_SLEW_INDEFINITE;
-		message->dir = dir;
-		message->withCorrection = false;
-		osStatus s;
-		if ((s = task_queue.put(message)) != osOK)
-		{
-			task_pool.free(message);
-			return s;
-		}
-
-		return osOK;
-	}
+	osStatus startSlewingIndefinite(axisrotdir_t dir);
 
 	/** Start tracking, until stop() is called
 	 * @param dir Direction to start continuous slewing
 	 * @return osStatus
 	 * @sa{RotationAxis::stop}
 	 */
-	osStatus startTracking(axisrotdir_t dir)
-	{
-		msg_t *message = task_pool.alloc();
-		if (!message)
-		{
-			return osErrorNoMemory;
-		}
-		message->signal = msg_t::SIGNAL_TRACK;
-		message->dir = dir;
-		osStatus s;
-		if ((s = task_queue.put(message)) != osOK)
-		{
-			task_pool.free(message);
-			return s;
-		}
-
-		return osOK;
-	}
+	osStatus startTracking(axisrotdir_t dir);
 
 	/**
-	* Guide on specified direction for specified time
-	* @param dir Direction of guiding
-	* @param time_ms Time to guide in milliseconds
-	* @return osStatus
-	*/
-	osStatus guide(axisrotdir_t dir, int time_ms)
-	{
-		if (dir == AXIS_ROTATE_NEGATIVE)
-			time_ms = -time_ms;
-		// Put the guide pulse into the queue
-		osStatus s;
-		if ((s = guide_queue.put((void*) (time_ms))) != osOK)
-		{
-			return s;
-		}
-		task_thread->flags_set(AXIS_GUIDE_SIGNAL); // Signal the task thread to read the queue
-		return osOK;
-	}
+	 * Guide on specified direction for specified time
+	 * @param dir Direction of guiding
+	 * @param time_ms Time to guide in milliseconds
+	 * @return osStatus
+	 */
+	osStatus guide(axisrotdir_t dir, int time_ms);
 
 	/**
 	 * Remove all queued commands if there are any. This function should be called if you want to ensure the mount if completely stopped
 	 */
-	void flushCommandQueue()
-	{
-		while (!task_queue.empty())
-		{
-			osEvent evt = task_queue.get(0);
-			if (evt.status == osEventMessage)
-			{
-				task_pool.free((msg_t*) evt.value.p);
-			}
-		}
-	}
+	void flushCommandQueue();
 
 	/**
 	 * Stop slewing or tracking. Calling this function will stop the axis from slewing, or tracking
 	 * @note In the case of slewing, the axis will perform a deceleration and then stop
 	 * @note If there are queued commands, they will be run immediately afterwards
 	 */
-	void stop()
-	{
-		flushCommandQueue();
-		task_thread->flags_set(AXIS_STOP_SIGNAL);
-	}
+	void stop();
 
 	/**
 	 * Perform an emergency stop. This should stop in ALL situations IMMEDIATELY without performing deceleration.
 	 * @note this call will kill all queued commands, so the mount will be fully stopped
 	 */
-	void emergency_stop()
-	{
-		flushCommandQueue();
-		task_thread->flags_set(AXIS_EMERGE_STOP_SIGNAL);
-	}
+	void emergency_stop();
 
 	/**
 	 * Only takes effect when decelerating from a slew. Signals the axis to keep its current speed, and enters AXIS_INERTIAL state.
 	 * This state can be exited by performing another slew/slew_indefinite and stopped in the normal way
 	 */
-	void stopKeepSpeed()
-	{
-		task_thread->flags_set(AXIS_STOP_KEEPSPEED_SIGNAL);
-	}
+	void stopKeepSpeed();
 
 	/** Set current angle of the axis in degrees.
 	 * @param new angle
 	 * @note Must be called only when the axis is stopped, otherwise behavior is unexpected
 	 */
-	void setAngleDeg(double angle)
-	{
-		stepper->setStepCount(angle * stepsPerDeg);
-	}
+	void setAngleDeg(double angle);
 
 	/** Returns the current angle of the axis in degrees
 	 * @note Can be called in any context
 	 */
-	double getAngleDeg()
-	{
-		return remainder(stepper->getStepCount() / stepsPerDeg, 360);
-	}
+	double getAngleDeg();
 
 	/** Returns the axis status
-	*/
-	axisstatus_t getStatus()
-	{
-		return status;
-	}
+	 */
+	axisstatus_t getStatus();
 
 	/** Returns the current slew speed (only for indefinite slew)
 	 */
-	double getSlewSpeed() const
-	{
-		return slewSpeed;
-	}
+	double getSlewSpeed() const;
 
 	/** Set slew speed of the axis (only for indefinite slew)
 	 * @param new slew speed in deg/s
 	 * @note Can now be called when a indefinite slew is in progress. 
 	 * @note If called during a target slew, the speed will be updated on the next slew
 	 */
-	void setSlewSpeed(double slewSpeed)
-	{
-		if (slewSpeed > 0)
-			this->slewSpeed = slewSpeed;
-
-		task_thread->flags_set(AXIS_SPEEDCHANGE_SIGNAL); // Signal the thread to use the new speed during a indefinite slew
-	}
+	void setSlewSpeed(double slewSpeed);
 
 	/**
-	* Returns track speed of the axis in units of sidereal speed
-	*/
-	double getTrackSpeedSidereal() const
-	{
-		return trackSpeed / sidereal_speed;
-	}
+	 * Returns track speed of the axis in units of sidereal speed
+	 */
+	double getTrackSpeedSidereal() const;
 
 	/** Set track speed in sidereal speed 
 	 * @param new track speed in sidereal rate
 	 * @note Must be called only when the axis is stopped
 	 */
-	void setTrackSpeedSidereal(double trackSpeed)
-	{
-		if (trackSpeed >= 0)
-		{
-			this->trackSpeed = trackSpeed * sidereal_speed;
-		}
-	}
+	void setTrackSpeedSidereal(double trackSpeed);
 
 	/**
-	* Returns guide speed of the axis in units of sidereal speed
-	*/
-	double getGuideSpeedSidereal() const
-	{
-		return guideSpeed / sidereal_speed;
-	}
+	 * Returns guide speed of the axis in units of sidereal speed
+	 */
+	double getGuideSpeedSidereal() const;
 
 	/** @param new guide speed in sidereal rate.
 	 * @note If called when a pulse guide is being performed, the value will be updated on the next pulse
 	 */
-	void setGuideSpeedSidereal(double guideSpeed)
-	{
-		if (guideSpeed > 0)
-			this->guideSpeed = guideSpeed * sidereal_speed;
-	}
+	void setGuideSpeedSidereal(double guideSpeed);
 
 	/**
-	* Returns current speed (deg/s) of the axis
-	*/
-	double getCurrentSpeed() const
-	{
-		return currentSpeed;
-	}
+	 * Returns current speed (deg/s) of the axis
+	 */
+	double getCurrentSpeed() const;
 
 	/**
-	* Returns which phase of slewing the axis is currently in
-	*/
-	axisslewstate_t getSlewState() const
-	{
-		return slewState;
-	}
+	 * Returns which phase of slewing the axis is currently in
+	 */
+	axisslewstate_t getSlewState() const;
 
 	/**
-	* Returns current axis rotation direction
-	*/
-	axisrotdir_t getCurrentDirection() const
-	{
-		return currentDirection;
-	}
-	
+	 * Returns current axis rotation direction
+	 */
+	axisrotdir_t getCurrentDirection() const;
+
 	/**
-	* Return true if a guiding pulse is being performed
-	*/
-	bool isGuiding() const
-	{
-		return guiding;
-	}
+	 * Return true if a guiding pulse is being performed
+	 */
+	bool isGuiding() const;
 
-	PEC* getPEC(){
-		return pec;
-	}
+	PEC* getPEC();
 
-	void setPEC(PEC* pec) {
-		this->pec = pec;
-	}
+	void setPEC(PEC *pec);
 
-	bool isPECEnabled() const {
-		return pecEnabled;
-	}
+	bool isPECEnabled() const;
 
-	void setPECEnabled(bool pecEnabled) {
-		this->pecEnabled = pecEnabled;
-	}
+	void setPECEnabled(bool pecEnabled);
 
 protected:
 
-	typedef struct
-	{
-		enum sig_t
-		{
+	typedef struct {
+		enum sig_t {
 			SIGNAL_SLEW_TO = 0, SIGNAL_SLEW_INDEFINITE, SIGNAL_TRACK
 		} signal;
 		double value;
-		axisrotdir_t dir;bool withCorrection;
+		axisrotdir_t dir;
+		bool withCorrection;
 	} msg_t; /// Message for inter-thread communication
 
 	/*Configurations*/
 	double stepsPerDeg; ///steps per degree
 	StepperMotor *stepper; ///Pointer to stepper motor
+	Encoder *encoder; ///Pointer to encoder interface
 	const char *axisName; /// Name of the axis
 	char *taskName; /// Name of the thread
 
@@ -422,35 +261,31 @@ protected:
 	void task(); /// Task thread entrance
 
 	/*Low-level functions for internal use*/
-	void slew(axisrotdir_t dir, double dest, bool indefinite, bool useCorrection);
+	void slew(axisrotdir_t dir, double dest, bool indefinite,
+			bool useCorrection);
 	void track(axisrotdir_t dir);
 
 	/*These functions can be overriden to provide mode selection before each type of operation is performed, such as microstepping and current setting*/
-	
+
 	/// Change low-level mode before slewing
-	virtual void slew_mode()
-	{
+	virtual void slew_mode() {
 	}
-	
+
 	/// Change low-level mode before tracking
-	virtual void track_mode()
-	{
+	virtual void track_mode() {
 	}
-	
+
 	/// Change low-level mode before correcting
-	virtual void correction_mode()
-	{
+	virtual void correction_mode() {
 	}
-	
+
 	/// Change low-level mode before going idle
-	virtual void idle_mode()
-	{
+	virtual void idle_mode() {
 	}
 
 	/// Stop the mount in case of error
 	virtual void err_cb();
-}
-;
+};
 
 #endif /* _AXIS_H_ */
 

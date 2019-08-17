@@ -24,6 +24,8 @@ static inline double clamp(double x) {
 #define MAX_ITERATION 30
 #define MAX_ITERATION_OPTIMIZATION 10
 
+#define MAXN	20
+
 static const double tol = 1e-10;
 static const double eps = 1e-13;
 static const double delta = 1e-7;
@@ -387,15 +389,6 @@ static double jac[20][5]; // can maximally hold 10 stars
 static double jacjac[5][5]; // J'J
 static double invj[5][5];
 
-static void fill_jacobian(const int N, const int j,
-		LocalEquatorialCoordinates stars0[],
-		LocalEquatorialCoordinates stars1[], const double &dd) {
-	for (int i = 0; i < N; i++) {
-		jac[i * 2][j] = (stars1[i].dec - stars0[i].dec) / dd;
-		jac[i * 2 + 1][j] = (stars1[i].ha - stars0[i].ha) / dd;
-	}
-}
-
 static double det33(int a1, int a2, int a3, int b1, int b2, int b3) {
 	return jacjac[a1][b1] * jacjac[a2][b2] * jacjac[a3][b3]
 			+ jacjac[a1][b2] * jacjac[a2][b3] * jacjac[a3][b1]
@@ -495,9 +488,9 @@ double alignNStars(const int N, const AlignmentStar stars[],
 	// Assuming the cone error is not huge, we should be fairly close to the local minimum
 	int i = 0;
 	double residue = 1e10;
-	LocalEquatorialCoordinates star_ref_local[N];
-	MountCoordinates star_meas[N];
-	MountCoordinates stars0[N], stars1[N];
+	LocalEquatorialCoordinates star_ref_local[MAXN];
+	MountCoordinates star_meas[MAXN];
+	MountCoordinates stars0[MAXN], stars1[MAXN];
 	double dp[5];
 	double f[20];
 
@@ -607,8 +600,12 @@ EqCalibration alignAuto(const int N, const AlignmentStar stars[],
 	} else {
 		if (N == 2) {
 			alignTwoStars(stars, loc, calib.pa, calib.offset);
-		} else {
+		} else if (N <= MAXN) {
 			alignNStars(N, stars, loc, calib.pa, calib.offset, calib.cone);
+		}
+		else{
+			// Only use the first MAXN stars
+			alignNStars(MAXN, stars, loc, calib.pa, calib.offset, calib.cone);
 		}
 	}
 	// Calculate RMS error

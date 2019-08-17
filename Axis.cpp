@@ -5,15 +5,15 @@
  *      Author: caoyuan9642
  */
 
-#include <Axis.h>
+#include "Axis.h"
 
 #define AXIS_DEBUG 1
 
 static inline double min(double x, double y) {
 	return (x < y) ? x : y;
 }
-Axis::Axis(double stepsPerDeg, StepperMotor *stepper, const char *name) :
-		stepsPerDeg(stepsPerDeg), stepper(stepper), axisName(name), currentSpeed(
+Axis::Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder, const char *name) :
+		stepsPerDeg(stepsPerDeg), stepper(stepper), encoder(encoder), axisName(name), currentSpeed(
 				0), currentDirection(AXIS_ROTATE_POSITIVE), slewSpeed(
 		MBED_CONF_PUSHTOGO_DEFAULT_SLEW_SPEED), trackSpeed(
 		MBED_CONF_PUSHTOGO_DEFAULT_TRACK_SPEED_SIDEREAL * sidereal_speed), guideSpeed(
@@ -92,7 +92,7 @@ void Axis::task() {
 				debug("%s: being slewed while not in STOPPED mode.\n",
 						axisName);
 			}
-			debug_if(0, "%s: SIG SLEW 0x%08x\n", axisName, Thread::gettid());
+			debug_if(0, "%s: SIG SLEW 0x%08x\n", axisName, (unsigned int) ThisThread::get_id());
 			slew_finish_sem.release(); /*Send a signal so that the caller is free to run*/
 			break;
 		case msg_t::SIGNAL_SLEW_INDEFINITE:
@@ -580,4 +580,185 @@ void Axis::track(axisrotdir_t dir) {
 void Axis::err_cb() {
 	debug_if(AXIS_DEBUG, "%s: stopped on error\n", axisName);
 	emergency_stop();
+}
+
+osStatus Axis::startSlewTo(axisrotdir_t dir, double angle,
+		bool withCorrection) {
+	msg_t *message = task_pool.alloc();
+	if (!message) {
+		return osErrorNoMemory;
+	}
+	message->signal = msg_t::SIGNAL_SLEW_TO;
+	message->value = angle;
+	message->dir = dir;
+	message->withCorrection = withCorrection;
+	osStatus s;
+	debug_if(AXIS_DEBUG, "%s: CLR SLEW 0x%08x\n", axisName,
+			(unsigned int) (ThisThread::get_id()));
+	slew_finish_sem.try_acquire(); // Make sure the semaphore is cleared. THIS MUST BE DONE BEFORE THE MESSAGE IS ENQUEUED
+	if ((s = task_queue.put(message)) != osOK) {
+		task_pool.free(message);
+		return s;
+	}
+	return osOK;
+}
+
+finishstate_t Axis::waitForSlew() {
+	debug_if(AXIS_DEBUG, "%s: WAIT SLEW 0x%08x\n", axisName,
+			(unsigned int) (ThisThread::get_id()));
+	slew_finish_sem.acquire();
+	// Check mount status
+	return slew_finish_state;
+}
+
+osStatus Axis::slewTo(axisrotdir_t dir, double angle) {
+	osStatus s;
+	if ((s = startSlewTo(dir, angle)) != osOK)
+		return s;
+
+	return waitForSlew();
+}
+
+osStatus Axis::startSlewingIndefinite(axisrotdir_t dir) {
+	msg_t *message = task_pool.alloc();
+	if (!message) {
+		return osErrorNoMemory;
+	}
+	message->signal = msg_t::SIGNAL_SLEW_INDEFINITE;
+	message->dir = dir;
+	message->withCorrection = false;
+	osStatus s;
+	if ((s = task_queue.put(message)) != osOK) {
+		task_pool.free(message);
+		return s;
+	}
+	return osOK;
+}
+
+osStatus Axis::startTracking(axisrotdir_t dir) {
+	msg_t *message = task_pool.alloc();
+	if (!message) {
+		return osErrorNoMemory;
+	}
+	message->signal = msg_t::SIGNAL_TRACK;
+	message->dir = dir;
+	osStatus s;
+	if ((s = task_queue.put(message)) != osOK) {
+		task_pool.free(message);
+		return s;
+	}
+	return osOK;
+}
+
+osStatus Axis::guide(axisrotdir_t dir, int time_ms) {
+	if (dir == AXIS_ROTATE_NEGATIVE)
+		time_ms = -time_ms;
+
+	// Put the guide pulse into the queue
+	osStatus s;
+	if ((s = guide_queue.put((void*) ((time_ms)))) != osOK) {
+		return s;
+	}
+	task_thread->flags_set(AXIS_GUIDE_SIGNAL);
+	return osOK;
+}
+
+void Axis::flushCommandQueue() {
+	while (!task_queue.empty()) {
+		osEvent evt = task_queue.get(0);
+		if (evt.status == osEventMessage) {
+			task_pool.free((msg_t*) evt.value.p);
+		}
+	}
+}
+
+void Axis::stop() {
+	flushCommandQueue();
+	task_thread->flags_set(AXIS_STOP_SIGNAL);
+}
+
+void Axis::emergency_stop() {
+	flushCommandQueue();
+	task_thread->flags_set(AXIS_EMERGE_STOP_SIGNAL);
+}
+
+void Axis::stopKeepSpeed() {
+	task_thread->flags_set(AXIS_STOP_KEEPSPEED_SIGNAL);
+}
+
+void Axis::setAngleDeg(double angle) {
+	stepper->setStepCount(angle * stepsPerDeg);
+}
+
+double Axis::getAngleDeg() {
+	if (!encoder)
+		return remainder(stepper->getStepCount() / stepsPerDeg, 360);
+	else
+		return encoder->read();
+}
+
+axisstatus_t Axis::getStatus() {
+	return status;
+}
+
+double Axis::getSlewSpeed() const {
+	return slewSpeed;
+}
+
+void Axis::setSlewSpeed(double slewSpeed) {
+	if (slewSpeed > 0)
+		this->slewSpeed = slewSpeed;
+
+	task_thread->flags_set(AXIS_SPEEDCHANGE_SIGNAL);
+}
+
+double Axis::getTrackSpeedSidereal() const {
+	return trackSpeed / sidereal_speed;
+}
+
+void Axis::setTrackSpeedSidereal(double trackSpeed) {
+	if (trackSpeed >= 0) {
+		this->trackSpeed = trackSpeed * sidereal_speed;
+	}
+}
+
+double Axis::getGuideSpeedSidereal() const {
+	return guideSpeed / sidereal_speed;
+}
+
+void Axis::setGuideSpeedSidereal(double guideSpeed) {
+	if (guideSpeed > 0)
+		this->guideSpeed = guideSpeed * sidereal_speed;
+}
+
+double Axis::getCurrentSpeed() const {
+	return currentSpeed;
+}
+
+axisslewstate_t Axis::getSlewState() const {
+	return slewState;
+}
+
+axisrotdir_t Axis::getCurrentDirection() const {
+	return currentDirection;
+}
+
+bool Axis::isGuiding() const {
+	return guiding;
+}
+
+PEC* Axis::getPEC() {
+	return pec;
+}
+
+void Axis::setPEC(PEC *pec) {
+	this->pec = pec;
+}
+
+bool Axis::isPECEnabled() const {
+	return pecEnabled;
+}
+
+void Axis::setPECEnabled(bool pecEnabled) {
+	this->pecEnabled = pecEnabled;
 }

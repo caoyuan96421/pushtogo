@@ -11,6 +11,7 @@ typedef enum
 	
 	// Modifiers, will only appear in getStatus() but not in status itself
 	MOUNT_GUIDING = 8,
+	MOUNT_TRACKING_GUIDING = MOUNT_TRACKING | MOUNT_GUIDING
 } mountstatus_t;
 
 class Mount

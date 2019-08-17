@@ -80,11 +80,13 @@ public:
 		setStringToConfig(getInstance().getConfigItemCheck(name), value);
 	}
 
+	static bool isConfigExist(const char *name){
+		return getInstance().getConfigItem(name) == NULL;
+	}
+
 private:
 	TelescopeConfiguration();
 	~TelescopeConfiguration();
-
-	static TelescopeConfiguration instance;
 
 	struct ConfigNode {
 		int key;
@@ -94,6 +96,7 @@ private:
 	} *head;
 
 	static TelescopeConfiguration& getInstance() {
+		static TelescopeConfiguration instance;
 		return instance;
 	}
 

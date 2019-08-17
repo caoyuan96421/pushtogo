@@ -8,10 +8,7 @@
 #ifndef _STEPOUT_H_
 #define _STEPOUT_H_
 
-#include "drivers/PwmOut.h"
-#include "drivers/Timer.h"
-
-using namespace mbed;
+#include "mbed.h"
 
 /**
  * General stepping output using PwmOut driver of MBED
@@ -26,7 +23,6 @@ public:
 	{
 		// Stop the output
 		output_off();
-		this->write(0.5f); // Keep DC
 		tim.start();
 	}
 	virtual ~StepOut()
@@ -54,6 +50,7 @@ private:
 	double freq;
 	stepstatus_t status;
 	Timer tim;
+	Mutex mutex;
 
 	void output_on();
 	void output_off();

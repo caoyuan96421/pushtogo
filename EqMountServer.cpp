@@ -36,7 +36,7 @@ EqMountServer::~EqMountServer() {
 
 void EqMountServer::task_thread() {
 	EventQueue queue(16 * EVENTS_EVENT_SIZE);
-	Thread evq_thd(osThreadGetPriority(Thread::gettid()), OS_STACK_SIZE, NULL,
+	Thread evq_thd(osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE, NULL,
 			"EqMountServer dispatcher");
 	evq_thd.start(callback(&queue, &EventQueue::dispatch_forever));
 
@@ -47,14 +47,13 @@ void EqMountServer::task_thread() {
 			stprintf(stream, "Error: out of memory\r\n");
 			break;
 		}
-		bool eof = false;
 		char x = 0;
 		int i = 0;
-		while (!eof && i < size - 2) {
+		while (i < size - 2) {
 			int s = stream.read(&x, 1);
-			if (s <= 0) { // End of file
-				eof = true;
-				break;
+			if (s <= 0) { // Device not ready yet
+				ThisThread::sleep_for(100); // Wait for device to come up
+				continue;
 			} else if (x == '\r' || x == '\n') { // End of line
 				break;
 			} else if (x == '\b' || x == '\x7F') { // Backspace
@@ -73,10 +72,6 @@ void EqMountServer::task_thread() {
 				stream.write(&x, 1);
 			}
 			buffer[i++] = (char) x;
-		}
-		if (eof && i == 0) {
-			delete[] buffer;
-			break;
 		}
 		if (echo) {
 			// Echo new line character after command
@@ -99,7 +94,7 @@ void EqMountServer::task_thread() {
 
 		char * command = strtok_r(buffer, delim, &saveptr); // Get the first token
 
-		if (strlen(command) == 0) { // Empty command
+		if (command == NULL || strlen(command) == 0) { // Empty command
 			delete[] buffer;
 			continue;
 		}
@@ -138,7 +133,7 @@ void EqMountServer::task_thread() {
 
 		if (cind == -1) {
 			debug_if(EMS_DEBUG, "Error: command %s not found.\n", command);
-			stprintf(stream, "Unknown command\r\n");
+			stprintf(stream, "Unknown command %s\r\n", command);
 			delete[] buffer;
 			delete[] args;
 			continue;
@@ -159,12 +154,11 @@ void EqMountServer::task_thread() {
 				&EqMountServer::command_execute);
 		while (queue.call(cb, commandlist[cind], argn, args, buffer) == 0) { // Use the event dispatching thread to run this
 			debug("Event queue full. Wait...\r\n");
-			Thread::wait(100);
+			ThisThread::sleep_for(100);
 		}
 
 		// The buffer and argument list will be deleted when the command finishes execution in the event dispatch thread
 	}
-	// If we reach here, it must be end of file
 }
 
 void EqMountServer::command_execute(ServerCommand &cmd, int argn, char *args[],
@@ -614,7 +608,7 @@ static int eqmount_state(EqMountServer *server, const char *cmd, int argn,
 		case MOUNT_TRACKING:
 			s = "tracking";
 			break;
-		case MOUNT_TRACKING | MOUNT_GUIDING:
+		case MOUNT_TRACKING_GUIDING:
 			s = "tracking_guiding";
 			break;
 		case MOUNT_NUDGING:
@@ -686,11 +680,11 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 	if (argn >= 2) {
 		return ERR_WRONG_NUM_PARAM;
 	} else if (argn == 1) {
-		if (strcmp(argv[0], "stamp") == 0) {
+		if (strcmp(argv[0], "stamp") == 0) { // Read timestamp
 			// Print timestamp value
 			stprintf(server->getStream(), "%s %d\r\n", cmd, (uint32_t) t);
 			return 0;
-		} else if (strcmp(argv[0], "sidereal") == 0) {
+		} else if (strcmp(argv[0], "sidereal") == 0) { // Read sidereal time (-180~180)
 			// Print sidereal time at current location
 			// 0.0 is sidereal midnight, 180/-180 is sidereal noon
 			double st = getLocalSiderealTime(t,
@@ -701,14 +695,12 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 			stprintf(server->getStream(), "%s %f\r\n", cmd, st);
 //			stprintf(server->getStream(), "%d:%d:%d LST\r\n", hh, mm, ss);
 			return 0;
-		} else if (strcmp(argv[0], "local") == 0) {
+		} else if (strcmp(argv[0], "local") == 0) { // Read local time (at longitude)
 			t += (int) (remainder(server->getEqMount()->getLocation().lon, 360)
 					* 240);
 
 #if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
-			char ibuf[64];
-			ctime_r(&t, ibuf);
-			strncpy(buf, ibuf, sizeof(buf));
+			ctime_r(&t, buf);
 #else
 			core_util_critical_section_enter();
 			char *ibuf = ctime(&t);
@@ -718,13 +710,11 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 
 			stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
 			return 0;
-		} else if (strcmp(argv[0], "zone") == 0) {
+		} else if (strcmp(argv[0], "zone") == 0) { // Read time zone
 			t += (int) (TelescopeConfiguration::getInt("timezone") * 3600);
 
 #if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
-			char ibuf[64];
-			ctime_r(&t, ibuf);
-			strncpy(buf, ibuf, sizeof(buf));
+			ctime_r(&t, buf);
 #else
 			core_util_critical_section_enter();
 			char *ibuf = ctime(&t);
@@ -733,6 +723,9 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 #endif
 
 			stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
+			return 0;
+		} else if (strcmp(argv[0], "hr") == 0){ // Read high resolution timestamp
+			stprintf(server->getStream(), "%s %.3f\r\n", cmd, server->getEqMount()->getClock().getTimeHighResolution());
 			return 0;
 		}
 
@@ -741,9 +734,7 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 // Print of formatted string of current time
 
 #if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
-	char ibuf[64];
-	ctime_r(&t, ibuf);
-	strncpy(buf, ibuf, sizeof(buf));
+	ctime_r(&t, buf);
 #else
 	core_util_critical_section_enter();
 	char *ibuf = ctime(&t);
@@ -819,15 +810,15 @@ ServerCommand commandlist[MAX_COMMAND] = { /// List of all commands
 		ServerCommand("align", "Star alignment", eqmount_align), /// Alignment
 		/// Above are allowed commands when another command is running
 
-				ServerCommand("goto",
-						"Perform go to operation to specified ra, dec coordinates",
-						eqmount_goto), 		/// Go to
-				ServerCommand("nudge", "Perform nudging on specified direction",
-						eqmount_nudge), 		/// Nudge
-				ServerCommand("track", "Start tracking in specified direction",
-						eqmount_track), 		/// Track
-				ServerCommand("guide", "Guide on specified direction",
-						eqmount_guide), /// Guide
-				ServerCommand("settime", "Set system time", eqmount_settime), /// System time
-				ServerCommand("", "", NULL) };
+		ServerCommand("goto",
+				"Perform go to operation to specified ra, dec coordinates",
+				eqmount_goto), 		/// Go to
+		ServerCommand("nudge", "Perform nudging on specified direction",
+				eqmount_nudge), 		/// Nudge
+		ServerCommand("track", "Start tracking in specified direction",
+				eqmount_track), 		/// Track
+		ServerCommand("guide", "Guide on specified direction",
+				eqmount_guide), /// Guide
+		ServerCommand("settime", "Set system time", eqmount_settime), /// System time
+		ServerCommand("", "", NULL) };
 

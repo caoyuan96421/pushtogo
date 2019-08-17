@@ -6,9 +6,10 @@
  */
 
 #ifndef TELESCOPE_DRIVER_SERIALGRAYABSENCODER_H_
+
 #define TELESCOPE_DRIVER_SERIALGRAYABSENCODER_H_
 
-#include <GrayAbsEncoder.h>
+#include "Encoder.h"
 #include <SerialDigitalInput.h>
 #include "mbed.h"
 

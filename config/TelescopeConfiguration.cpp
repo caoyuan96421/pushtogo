@@ -14,9 +14,6 @@
 
 #define TC_DEBUG 1
 
-TelescopeConfiguration TelescopeConfiguration::instance =
-		TelescopeConfiguration();
-
 static const char* typeName(DataType type) {
 	switch (type) {
 	case DATATYPE_INT:
@@ -35,53 +32,65 @@ static const char* typeName(DataType type) {
 // @formatter:off
 static const ConfigItem default_config[] =
 		{
-			{.config = "latitude", .name = "Your latitude", .help =	"Latitude of observer, in degrees north of equator.",
+			{.config = const_cast<char *>("latitude"), .name = "Your latitude", .help =	"Latitude of observer, in degrees north of equator.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata =0 }, .min = { .ddata = -90 }, .max = { .ddata = 90 } },
 
-			{.config =	"longitude", .name = "Your longitude", .help =	"Longitude of observer, in degrees east of Greenwich.",
+			{.config =	const_cast<char *>("longitude"), .name = "Your longitude", .help =	"Longitude of observer, in degrees east of Greenwich.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata = 0 }, .min = { .ddata = -180 }, .max = { .ddata = 180 } },
 
-			{.config = "timezone",	.name = "Your timezone", .help = "Timezone in hours ahead of UTC time.",
+			{.config = const_cast<char *>("timezone"),	.name = "Your timezone", .help = "Timezone in hours ahead of UTC time.",
 			.type =	DATATYPE_INT, .value = { .idata = 0 }, .min = {.idata = -12 }, .max = { .idata = 12 } },
 
-			{.config = "motor_steps", .name = "Steps per Revolution",	.help =	"Motor steps/revolution.\nIf you hard-programed the microstepping, here should use total microstep resolution.",
+			{.config = const_cast<char *>("motor_steps"), .name = "Steps per Revolution",	.help =	"Motor steps/revolution.\nIf you hard-programed the microstepping, here should use total microstep resolution.",
 			.type = DATATYPE_INT, .value = { .idata = 400 }, .min =	{ .idata = 1 }, .max = { .idata = 1000000 } },
 
-			{.config = "gear_reduction", .name = "Gear Ratio",	.help = "Gearbox reduction ratio. ",
+			{.config = const_cast<char *>("gear_reduction"), .name = "Gear Ratio",	.help = "Gearbox reduction ratio. ",
 			.type = DATATYPE_DOUBLE, .value = { .ddata = 1 }, .min = { .ddata = 0 }, .max = { .ddata = 10000 } },
 
-			{.config = "worm_teeth", .name = "Worm Teeth", .help =	"Number of teeth on the ring gear.",
+			{.config = const_cast<char *>("worm_teeth"), .name = "Worm Teeth", .help =	"Number of teeth on the ring gear.",
 			.type =	DATATYPE_INT, .value = { .idata = 180 }, .min =	{ .idata = 1 }, .max = { .idata = 10000 } },
 
-			{.config = "ra_invert", .name = "Invert RA direction", .help =	"Invert RA driving direction?\n Save and restart to take effect",
+			{ .config = const_cast<char *>("ra_use_encoder"), .name = "Use encoder on RA", .help = "Use encoder to determine RA position",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{ .config = "dec_invert", .name = "Invert DEC direction", .help = "Invert DEC driving direction?\n Save and restart to take effect",
+			{ .config = const_cast<char *>("dec_use_encoder"), .name = "Use encoder on DEC", .help = "Use encoder to determine DEC position",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{.config = "goto_slew_speed", .name = "Goto slew speed", .help = "Slewing speed used for goto, in deg/s",
-			.type =	DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min = { .ddata = 1 }, .max = { .ddata = 10 } },
+			{.config = const_cast<char *>("ra_invert"), .name = "Invert RA direction", .help =	"Invert RA driving direction?\n Save and restart to take effect",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{ .config = "acceleration", .name = "Acceleration",	.help = "Acceleration in deg/s^2.",
+			{ .config = const_cast<char *>("dec_invert"), .name = "Invert DEC direction", .help = "Invert DEC driving direction?\n Save and restart to take effect",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
+
+			{.config = const_cast<char *>("ra_enc_invert"), .name = "Reverse RA encoder", .help =	"Reverse counting direction of RA encoder",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
+
+			{ .config = const_cast<char *>("dec_enc_invert"), .name = "Reverse DEC encoder", .help = "Reverse counting direction of DEC encoder",
+			.type = DATATYPE_BOOL, .value = { .bdata = false } },
+
+			{.config = const_cast<char *>("goto_slew_speed"), .name = "Goto slew speed", .help = "Slewing speed used for goto, in deg/s",
+			.type =	DATATYPE_DOUBLE, .value = { .ddata = 2 }, .min = { .ddata = 1 }, .max = { .ddata = 10 } },
+
+			{ .config = const_cast<char *>("acceleration"), .name = "Acceleration",	.help = "Acceleration in deg/s^2.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata = 5 }, .min = { .ddata = 0.01 }, .max = { .ddata = 1000 } },
 
-			{ .config = "max_speed", .name = "Max slewing speed", .help = "Max slewing speed. Reduce this value if losing steps.",
+			{ .config = const_cast<char *>("max_speed"), .name = "Max slewing speed", .help = "Max slewing speed. Reduce this value if losing steps.",
 			.type = DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min = { .ddata = 1 }, .max = { .ddata = 100 } },
 
-			{ .config = "pec_granularity", .name = "PEC Granularity", .help = "Number of PEC slots per revolution of the worm",
+			{ .config = const_cast<char *>("pec_granularity"), .name = "PEC Granularity", .help = "Number of PEC slots per revolution of the worm",
 			.type = DATATYPE_INT, .value = { .idata = 512 }, .min = {.idata = 32 }, .max = { .idata = 16384} },
 
-			{ .config = "serial_baud", .name = "Baud rate", .help = "Baud rate of communication",
+			{ .config = const_cast<char *>("serial_baud"), .name = "Baud rate", .help = "Baud rate of communication",
 			.type = DATATYPE_INT, .value = { .idata = 115200 }, .min = {.idata = 9600 }, .max = { .idata = 560800} },
 
-			{.config = "" } };
+			{.config = const_cast<char *>("") } };
 // @formatter:on
 int TelescopeConfiguration::eqmount_config(EqMountServer *server,
 		const char *cmd, int argn, char *argv[]) {
 	char buf[256];
 	if (argn == 0) {
 		// Print all config names
-		ConfigNode *p = instance.head;
+		ConfigNode *p = getInstance().head;
 		stprintf(server->getStream(), "%s", cmd);
 		for (; p; p = p->next) {
 			stprintf(server->getStream(), " %s", p->config->config);
@@ -94,7 +103,7 @@ int TelescopeConfiguration::eqmount_config(EqMountServer *server,
 		stprintf(server->getStream(), "\r\n");
 	} else {
 		char *config_name = argv[0]; // Name of the config in question
-		ConfigItem *config = instance.getConfigItem(config_name);
+		ConfigItem *config = getInstance().getConfigItem(config_name);
 		if (!config) {
 			stprintf(server->getStream(), "%s Error: config %s not found\r\n",
 					cmd, config_name);
@@ -201,6 +210,10 @@ TelescopeConfiguration::TelescopeConfiguration() {
 		q = r;
 	}
 	head = r;
+
+#ifdef NVSTORE_ENABLED
+	NVStore::get_instance().set_max_keys(64);
+#endif
 
 	EqMountServer::addCommand(
 			ServerCommand("config", "Configuration subsystem",
@@ -355,7 +368,8 @@ static void setConfigValue(ConfigItem *config, const char *value) {
 
 void TelescopeConfiguration::setConfigByName(const char *name,
 		const char *value) {
-	ConfigItem *config = instance.getConfigItem(name);
+	// Find the config node if it already exists
+	ConfigItem *config = getInstance().getConfigItem(name);
 	if (config == NULL) {
 		if (*value == '\0') {
 			// Empty value string, don't add
@@ -368,11 +382,15 @@ void TelescopeConfiguration::setConfigByName(const char *name,
 		config->help = "";
 		config->name = config->config;
 		config->extra = true;
-		ConfigNode *n = new ConfigNode;
+		ConfigNode *n = new ConfigNode, *m = getInstance().head;
 		n->config = config;
 		n->default_config = NULL;
-		n->next = instance.head;
-		instance.head = n;
+		// Find tail
+		while (m->next != NULL)
+			m = m->next;
+		m->next = n;
+		n->key = m->key + 1;
+		n->next = NULL;
 		if (strcmp(value, "true") == 0 || strcmp(value, "false") == 0) {
 			config->type = DATATYPE_BOOL;
 		} else if (!isalpha(value[0])) {
@@ -458,13 +476,13 @@ void TelescopeConfiguration::readFromFile(FILE *fp) {
 		strncpy(value, q, s - q + 1);
 		value[s - q + 1] = '\0';
 
-		instance.setConfigByName(parameter, value);
+		getInstance().setConfigByName(parameter, value);
 	}
 }
 
 void TelescopeConfiguration::writeToFile(FILE *fp) {
 	char buf[256];
-	for (ConfigNode *p = instance.head; p; p = p->next) {
+	for (ConfigNode *p = getInstance().head; p; p = p->next) {
 		getStringFromConfig(p->config, buf, sizeof(buf));
 		fprintf(fp, "%s = %s\n", p->config->config, buf);
 	}
@@ -477,9 +495,9 @@ int TelescopeConfiguration::saveConfig_NV() {
 	bool success = true;
 	NVStore &nv = NVStore::get_instance();
 
-	for (ConfigNode *p = instance.head; p; p = p->next) {
+	for (ConfigNode *p = getInstance().head; p; p = p->next) {
 		// Format of saving: [name] [value]
-		size_t len = snprintf(buf, sizeof(buf), "%s ", p->config->name);
+		size_t len = snprintf(buf, sizeof(buf), "%s ", p->config->config);
 		getStringFromConfig(p->config, buf + len, sizeof(buf) - len);
 
 		if (nv.set(p->key, strlen(buf), buf) != NVSTORE_SUCCESS) {
@@ -504,7 +522,8 @@ int TelescopeConfiguration::readConfig_NV() {
 		char *name = buf;
 		char *value = sp + 1;
 		*sp = '\0'; // Terminate name string
-		instance.setConfigByName(name, value);
+		*(buf + actual_size) = '\0'; // Terminate value string
+		getInstance().setConfigByName(name, value);
 	}
 
 	return key >= sizeof(default_config) / sizeof(ConfigItem); // Success if at least all default items are set
