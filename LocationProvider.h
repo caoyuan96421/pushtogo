@@ -1,8 +1,6 @@
 #ifndef _LOCATION_PROVIDER_H
 #define _LOCATION_PROVIDER_H
 
-class LocationProvider;
-
 #include "CelestialMath.h"
 /**
  * Provides location information. Can be overriden if a GPS is installed for example.

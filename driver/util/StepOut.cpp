@@ -102,11 +102,11 @@ double StepOut::getFrequency() {
 }
 
 void StepOut::output_on() {
-//	pinmap_pinout(_pwm.pin, PinMap_PWM);
-	write(0.5f);
+	pinmap_pinout(_pwm.pin, PinMap_PWM);
+//	write(0.5f);
 }
 
 void StepOut::output_off() {
-//	pin_function(_pwm.pin, STM_PIN_DATA(STM_MODE_OUTPUT_PP, GPIO_NOPULL, 0));
-	write(0);
+	pin_function(_pwm.pin, STM_PIN_DATA(STM_MODE_OUTPUT_PP, GPIO_NOPULL, 0));
+//	write(0);
 }

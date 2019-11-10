@@ -1,9 +1,7 @@
 #include <math.h>
 #include "EquatorialMount.h"
 
-#define EM_DEBUG 0
-
-EquatorialMount::EquatorialMount(Axis& ra, Axis& dec, UTCClock& clk,
+EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 		LocationProvider &loc) :
 		ra(ra), dec(dec), clock(clk), loc(loc), curr_pos(0, 0), curr_nudge_dir(
 				NUDGE_NONE), nudgeSpeed(0), pier_side(PIER_SIDE_EAST), num_alignment_stars(
@@ -21,6 +19,18 @@ EquatorialMount::EquatorialMount(Axis& ra, Axis& dec, UTCClock& clk,
 	this->ra.setPEC(&pec);
 	this->ra.setPECEnabled(true);
 
+	// Obtain encoder offset from config
+	if (ra.getEncoder()
+			&& TelescopeConfiguration::isConfigExist("ra_encoder_offset")) {
+		ra.setEncoderOffset(
+				TelescopeConfiguration::getDouble("ra_encoder_offset"));
+	}
+	if (dec.getEncoder()
+			&& TelescopeConfiguration::isConfigExist("dec_encoder_offset")) {
+		dec.setEncoderOffset(
+				TelescopeConfiguration::getDouble("dec_encoder_offset"));
+	}
+
 	// Set in tracking mode
 	startTracking();
 }
@@ -31,12 +41,11 @@ osStatus EquatorialMount::goTo(double ra_dest, double dec_dest) {
 
 osStatus EquatorialMount::goTo(EquatorialCoordinates dest) {
 
-	debug_if(EM_DEBUG, "dest ra=%.2f, dec=%.2f\n", dest.ra, dest.dec);
+	debug_ptg(EM_DEBUG, "dest ra=%.2f, dec=%.2f\r\n", dest.ra, dest.dec);
 
 	updatePosition(); // Get the latest position information
 
-	if (EM_DEBUG)
-		printPosition();
+	printPosition();
 
 	for (int i = 0; i < 2; i++) {
 		// Convert to Mount coordinates. Automatically determine the pier side, then apply offset
@@ -47,8 +56,7 @@ osStatus EquatorialMount::goTo(EquatorialCoordinates dest) {
 			return s;
 	}
 
-	if (EM_DEBUG)
-		printPosition();
+	printPosition();
 
 	return osOK;
 }
@@ -62,13 +70,12 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 		was_tracking = true;
 		stopSync();
 	} else if (status != MOUNT_STOPPED) {
-		debug("EM: goTo requested while mount is not stopped.\n");
+		debug_ptg(EM_DEBUG, "goTo requested while mount is not stopped.\r\n");
 		mutex_execution.unlock();
 		return osErrorParameter;
 	}
-	debug_if(EM_DEBUG, "EM: goTo\n");
-	debug_if(EM_DEBUG, "dstmnt ra=%.2f, dec=%.2f\n", dest_mount.ra_delta,
-			dest_mount.dec_delta);
+	debug_ptg(EM_DEBUG, "goTo dstmnt ra=%.2f, dec=%.2f\r\n",
+			dest_mount.ra_delta, dest_mount.dec_delta);
 
 	axisrotdir_t dec_dir, ra_dir;
 	ra_dir =
@@ -86,7 +93,7 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 					< remainder(curr_pos.dec_delta, 360.0)) ?
 					AXIS_ROTATE_NEGATIVE : AXIS_ROTATE_STOP;
 
-	debug_if(EM_DEBUG, "EM: start slewing\n");
+	debug_ptg(EM_DEBUG, "start slewing\r\n");
 	status = MOUNT_SLEWING;
 	ra.startSlewTo(ra_dir, dest_mount.ra_delta, withCorrection);
 	dec.startSlewTo(dec_dir, dest_mount.dec_delta, withCorrection);
@@ -94,7 +101,7 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 	int ret = (int) ra.waitForSlew();
 	ret |= (int) dec.waitForSlew();
 
-	debug_if(EM_DEBUG, "EM: slewing finished\n");
+	debug_ptg(EM_DEBUG, "slewing finished\r\n");
 
 	status = MOUNT_STOPPED;
 
@@ -115,7 +122,8 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 
 osStatus EquatorialMount::startTracking() {
 	if (status != MOUNT_STOPPED) {
-		debug("EM: tracking requested while mount is not stopped.\n");
+		debug_ptg(EM_DEBUG,
+				"tracking requested while mount is not stopped.\r\n");
 		return osErrorParameter;
 	}
 
@@ -240,7 +248,7 @@ osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 					// This is the complicated part
 					double trackSpeed = ra.getTrackSpeedSidereal()
 							* sidereal_speed;
-					debug_if(EM_DEBUG > 1, "EM: ra, ns=%f, ts=%f\n", nudgeSpeed,
+					debug_ptg(EM_DEBUG, "ra, ns=%f, ts=%f\r\n", nudgeSpeed,
 							trackSpeed);
 					if (ra_dir == AXIS_ROTATE_POSITIVE) {
 						// Same direction as tracking
@@ -271,8 +279,8 @@ osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 		else
 			status = MOUNT_NUDGING;
 
-		debug_if(EM_DEBUG, "status=%d, ra_dir=%d, dec_dir=%d\r\n", (int) status,
-				(int) ra_dir, (int) dec_dir);
+		debug_ptg(EM_DEBUG, "status=%d, ra_dir=%d, dec_dir=%d\r\n",
+				(int) status, (int) ra_dir, (int) dec_dir);
 	}
 	mutex_execution.unlock();
 
@@ -309,6 +317,13 @@ osStatus EquatorialMount::stopTracking() {
 	}
 	mutex_execution.unlock();
 	return osOK;
+}
+
+void EquatorialMount::printPosition() {
+	debug_ptg(EM_DEBUG, "Mount: RA=%7.2f, DEC=%7.2f %c\n", curr_pos.ra_delta,
+			curr_pos.dec_delta, (curr_pos.side == PIER_SIDE_WEST) ? 'W' : 'E');
+	debug_ptg(EM_DEBUG, "EQ:    RA=%7.2f, DEC=%7.2f\n", curr_pos_eq.ra,
+			curr_pos_eq.dec);
 }
 
 void EquatorialMount::updatePosition() {
@@ -467,4 +482,19 @@ void EquatorialMount::forceAlignment() {
 				alignment_stars[i].star_ref);
 		alignment_stars[i].timestamp = clock.getTime();
 	}
+}
+
+void EquatorialMount::setEncoderIndex() {
+	double ra_off = ra.getAngleDeg() + ra.getEncoderOffset();
+	double dec_off = dec.getAngleDeg() + dec.getEncoderOffset();
+	// Set encoder offset to cancel current mount position values
+	ra.setEncoderOffset(ra_off);
+	dec.setEncoderOffset(dec_off);
+
+	TelescopeConfiguration::setDouble("ra_encoder_offset", ra_off);
+	TelescopeConfiguration::setDouble("dec_encoder_offset", dec_off);
+#ifdef NVSTORE_ENABLED
+	TelescopeConfiguration::saveConfig_NV();
+#endif
+
 }

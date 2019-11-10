@@ -66,7 +66,7 @@ public:
 		return reverse;
 	}
 
-protected:
+//protected:
 	/**
 	 * Low-level readout of encoder position, must be implemented
 	 * Call to this function is protected by mutex, so the api is thread safe
@@ -91,7 +91,7 @@ public:
 	}
 	virtual ~GrayAbsEncoder() {
 	}
-protected:
+//protected:
 	/**
 	 * Low-level readout of position
 	 */

@@ -7,19 +7,18 @@
 
 #include "Axis.h"
 
-#define AXIS_DEBUG 1
-
 static inline double min(double x, double y) {
 	return (x < y) ? x : y;
 }
-Axis::Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder, const char *name) :
-		stepsPerDeg(stepsPerDeg), stepper(stepper), encoder(encoder), axisName(name), currentSpeed(
-				0), currentDirection(AXIS_ROTATE_POSITIVE), slewSpeed(
+Axis::Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder,
+		const char *name) :
+		stepsPerDeg(stepsPerDeg), stepper(stepper), encoder(encoder), axisName(
+				name), currentSpeed(0), currentDirection(AXIS_ROTATE_POSITIVE), slewSpeed(
 		MBED_CONF_PUSHTOGO_DEFAULT_SLEW_SPEED), trackSpeed(
 		MBED_CONF_PUSHTOGO_DEFAULT_TRACK_SPEED_SIDEREAL * sidereal_speed), guideSpeed(
 		MBED_CONF_PUSHTOGO_DEFAULT_GUIDE_SPEED_SIDEREAL * sidereal_speed), status(
 				AXIS_STOPPED), slewState(AXIS_NOT_SLEWING), slew_finish_sem(0,
-				1), slew_finish_state(FINISH_COMPLETE), guiding(false), pec(
+				1), slew_finish_state(FINISH_COMPLETE), guiding(false), encoder_offset(0), pec(
 		NULL), pecEnabled(false) {
 	if (stepsPerDeg <= 0)
 		error("Axis: steps per degree must be > 0");
@@ -55,8 +54,7 @@ Axis::~Axis() {
 }
 
 void Axis::task() {
-
-	/*Main loop of RotationAxis*/
+	/*Main loop of Axis*/
 	while (true) {
 		/*Get next message*/
 		msg_t *message;
@@ -77,11 +75,11 @@ void Axis::task() {
 			task_pool.free(message);
 		} else {
 			/*Error*/
-			debug("%s: Error fetching the task queue.\n", axisName);
+			debug_ptg(AXIS_DEBUG, "%s: Error fetching the task queue.\r\n", axisName);
 			continue;
 		}
-		debug_if(AXIS_DEBUG, "%s: MSG %d %f %d 0x%8x\n", axisName, signal,
-				value, dir);
+		debug_ptg(AXIS_DEBUG, "%s: MSG %d %f %d\r\n", axisName, signal, value,
+				dir);
 
 		/*Check the type of the signal, and start corresponding operations*/
 		switch (signal) {
@@ -89,17 +87,18 @@ void Axis::task() {
 			if (status == AXIS_STOPPED) {
 				slew(dir, value, false, wc);
 			} else {
-				debug("%s: being slewed while not in STOPPED mode.\n",
+				debug_ptg(AXIS_DEBUG, "%s: being slewed while not in STOPPED mode.\r\n",
 						axisName);
 			}
-			debug_if(0, "%s: SIG SLEW 0x%08x\n", axisName, (unsigned int) ThisThread::get_id());
+			debug_ptg(AXIS_DEBUG, "%s: SIG SLEW 0x%08x\r\n", axisName,
+					(unsigned int) ThisThread::get_id());
 			slew_finish_sem.release(); /*Send a signal so that the caller is free to run*/
 			break;
 		case msg_t::SIGNAL_SLEW_INDEFINITE:
 			if (status == AXIS_STOPPED || status == AXIS_INERTIAL) {
 				slew(dir, 0.0, true, false);
 			} else {
-				debug("%s: being slewed while not in STOPPED mode.\n",
+				debug_ptg(AXIS_DEBUG, "%s: being slewed while not in STOPPED mode.\r\n",
 						axisName);
 			}
 			break;
@@ -107,12 +106,12 @@ void Axis::task() {
 			if (status == AXIS_STOPPED) {
 				track(dir);
 			} else {
-				debug("%s: trying to track while not in STOPPED mode.\n",
+				debug_ptg(AXIS_DEBUG, "%s: trying to track while not in STOPPED mode.\r\n",
 						axisName);
 			}
 			break;
 		default:
-			debug("%s: undefined signal %d\n", axisName, message->signal);
+			debug_ptg(AXIS_DEBUG, "%s: undefined signal %d\r\n", axisName, message->signal);
 		}
 	}
 }
@@ -120,11 +119,11 @@ void Axis::task() {
 void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		bool useCorrection) {
 	if (!indefinite && (isnan(dest) || isinf(dest))) {
-		debug("%s: invalid angle.\n", axisName);
+		debug_ptg(AXIS_DEBUG, "%s: invalid angle.\r\n", axisName);
 		return;
 	}
 	if (dir == AXIS_ROTATE_STOP) {
-		debug("%s: skipped.\n", axisName);
+		debug_ptg(AXIS_DEBUG, "%s: skipped.\r\n", axisName);
 		return;
 	}
 
@@ -147,7 +146,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		delta = 0;
 	}
 	delta = remainder(delta - 180.0, 360.0) + 180.0; /*Shift to 0-360 deg*/
-	debug_if(AXIS_DEBUG, "%s: start=%f, end=%f, delta=%f\n", axisName, angleDeg,
+	debug_ptg(AXIS_DEBUG, "%s: start=%f, end=%f, delta=%f\r\n", axisName, angleDeg,
 			dest, delta);
 
 	double startSpeed = 0;
@@ -193,7 +192,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 			if (waitTime < 0.0)
 				waitTime = 0.0; // With the above calculations, waitTime should no longer be zero. But if it happens to be so, let the correction do the job
 
-			debug_if(AXIS_DEBUG, "%s: endspeed = %f deg/s, time=%f, acc=%f\n",
+			debug_ptg(AXIS_DEBUG, "%s: endspeed = %f deg/s, time=%f, acc=%f\r\n",
 					axisName, endSpeed, waitTime, acceleration);
 		} else {
 			// Angle difference is too small, skip slewing
@@ -222,7 +221,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		if (ramp_steps < 1)
 			ramp_steps = 1;
 
-		debug_if(AXIS_DEBUG, "%s: accelerate in %d steps\n", axisName,
+		debug_ptg(AXIS_DEBUG, "%s: accelerate in %d steps\r\n", axisName,
 				ramp_steps); // TODO: DEBUG
 
 		for (unsigned int i = 1; i <= ramp_steps; i++) {
@@ -257,7 +256,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 
 		/*Keep slewing and wait*/
 		slewState = AXIS_SLEW_CONSTANT_SPEED;
-		debug_if(AXIS_DEBUG, "%s: wait for %f\n", axisName, waitTime); // TODO
+		debug_ptg(AXIS_DEBUG, "%s: wait for %f\r\n", axisName, waitTime); // TODO
 		wait_ms = (isinf(waitTime)) ? osWaitForever : (int) (waitTime * 1000);
 
 		tim.reset();
@@ -289,7 +288,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 					if (ramp_steps < 1)
 						ramp_steps = 1;
 
-					debug_if(AXIS_DEBUG, "%s: accelerate in %d steps\n",
+					debug_ptg(AXIS_DEBUG, "%s: accelerate in %d steps\r\n",
 							axisName, ramp_steps); // TODO: DEBUG
 
 					for (unsigned int i = 1; i <= ramp_steps; i++) {
@@ -339,7 +338,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		if (ramp_steps < 1)
 			ramp_steps = 1;
 
-		debug_if(AXIS_DEBUG, "%s: decelerate in %d steps from %f\n", axisName,
+		debug_ptg(AXIS_DEBUG, "%s: decelerate in %d steps from %f\r\n", axisName,
 				ramp_steps, endSpeed); // TODO: DEBUG
 
 		for (unsigned int i = ramp_steps - 1; i >= 1; i--) {
@@ -380,13 +379,13 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 				* sidereal_speed;
 		/*Use correction to goto the final angle with high resolution*/
 		angleDeg = getAngleDeg();
-		debug_if(AXIS_DEBUG, "%s: correct from %f to %f deg\n", axisName,
+		debug_ptg(AXIS_DEBUG, "%s: correct from %f to %f deg\r\n", axisName,
 				angleDeg, dest); // TODO: DEBUG
 
 		double diff = remainder(angleDeg - dest, 360.0);
 		if (diff > MBED_CONF_PUSHTOGO_MAX_CORRECTION_ANGLE) {
-			debug(
-					"%s: correction too large: %f. Check hardware configuration.\n",
+			debug_ptg(AXIS_DEBUG,
+					"%s: correction too large: %f. Check hardware configuration.\r\n",
 					axisName, diff);
 			stop();
 			idle_mode();
@@ -407,8 +406,8 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 
 			int correctionTime_ms = (int) (fabs(diff) / currentSpeed * 1000); // Use the accurate speed for calculating time
 
-			debug_if(AXIS_DEBUG,
-					"%s: correction: from %f to %f deg. time=%d ms\n", axisName,
+			debug_ptg(AXIS_DEBUG,
+					"%s: correction: from %f to %f deg. time=%d ms\r\n", axisName,
 					angleDeg, dest, correctionTime_ms); //TODO: DEBUG
 			if (correctionTime_ms < MBED_CONF_PUSHTOGO_MIN_CORRECTION_TIME) {
 				break;
@@ -430,11 +429,11 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		}
 
 		if (!nTry) {
-			debug("%s: correction failed. Check hardware configuration.\n",
+			debug_ptg(AXIS_DEBUG, "%s: correction failed. Check hardware configuration.\r\n",
 					axisName);
 		}
 
-		debug_if(AXIS_DEBUG, "%s: correction finished: %f deg\n", axisName,
+		debug_ptg(AXIS_DEBUG, "%s: correction finished: %f deg\r\n", axisName,
 				angleDeg); //TODO:DEBUG
 	}
 	emerge_stop2:
@@ -442,6 +441,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 	currentSpeed = 0;
 	status = AXIS_STOPPED;
 	idle_mode();
+	sync_count();
 }
 
 void Axis::track(axisrotdir_t dir) {
@@ -501,7 +501,7 @@ void Axis::track(axisrotdir_t dir) {
 						// Clamp to maximum guide time
 						guideTime_ms = abs(guideTime_ms);
 						if (guideTime_ms > MBED_CONF_PUSHTOGO_MAX_GUIDE_TIME) {
-							debug("Axis: Guiding time too long: %d ms\n",
+							debug_ptg(AXIS_DEBUG, "Axis: Guiding time too long: %d ms\r\n",
 									abs(guideTime_ms));
 							guideTime_ms = MBED_CONF_PUSHTOGO_MAX_GUIDE_TIME;
 						}
@@ -575,10 +575,18 @@ void Axis::track(axisrotdir_t dir) {
 	stepper->stop();
 	status = AXIS_STOPPED;
 	idle_mode();
+	sync_count();
+}
+
+void Axis::sync_count() {
+	if (!encoder)
+		return;
+	double angle = encoder->read();
+	stepper->setStepCount(angle * stepsPerDeg);
 }
 
 void Axis::err_cb() {
-	debug_if(AXIS_DEBUG, "%s: stopped on error\n", axisName);
+	debug_ptg(AXIS_DEBUG, "%s: stopped on error\r\n", axisName);
 	emergency_stop();
 }
 
@@ -593,7 +601,7 @@ osStatus Axis::startSlewTo(axisrotdir_t dir, double angle,
 	message->dir = dir;
 	message->withCorrection = withCorrection;
 	osStatus s;
-	debug_if(AXIS_DEBUG, "%s: CLR SLEW 0x%08x\n", axisName,
+	debug_ptg(AXIS_DEBUG, "%s: CLR SLEW 0x%08x\r\n", axisName,
 			(unsigned int) (ThisThread::get_id()));
 	slew_finish_sem.try_acquire(); // Make sure the semaphore is cleared. THIS MUST BE DONE BEFORE THE MESSAGE IS ENQUEUED
 	if ((s = task_queue.put(message)) != osOK) {
@@ -604,7 +612,7 @@ osStatus Axis::startSlewTo(axisrotdir_t dir, double angle,
 }
 
 finishstate_t Axis::waitForSlew() {
-	debug_if(AXIS_DEBUG, "%s: WAIT SLEW 0x%08x\n", axisName,
+	debug_ptg(AXIS_DEBUG, "%s: WAIT SLEW 0x%08x\r\n", axisName,
 			(unsigned int) (ThisThread::get_id()));
 	slew_finish_sem.acquire();
 	// Check mount status
@@ -693,8 +701,9 @@ void Axis::setAngleDeg(double angle) {
 double Axis::getAngleDeg() {
 	if (!encoder)
 		return remainder(stepper->getStepCount() / stepsPerDeg, 360);
-	else
-		return encoder->read();
+	else {
+		return remainder(encoder->read() - encoder_offset, 360);
+	}
 }
 
 axisstatus_t Axis::getStatus() {

@@ -11,8 +11,10 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <float.h>
+#include "printf.h"
 
-#define TC_DEBUG 1
+ConfigNode *TelescopeConfiguration::head;
 
 static const char* typeName(DataType type) {
 	switch (type) {
@@ -81,7 +83,7 @@ static const ConfigItem default_config[] =
 			.type = DATATYPE_INT, .value = { .idata = 512 }, .min = {.idata = 32 }, .max = { .idata = 16384} },
 
 			{ .config = const_cast<char *>("serial_baud"), .name = "Baud rate", .help = "Baud rate of communication",
-			.type = DATATYPE_INT, .value = { .idata = 115200 }, .min = {.idata = 9600 }, .max = { .idata = 560800} },
+			.type = DATATYPE_INT, .value = { .idata = 115200 }, .min = {.idata = 9600 }, .max = { .idata = 2000000} },
 
 			{.config = const_cast<char *>("") } };
 // @formatter:on
@@ -90,47 +92,46 @@ int TelescopeConfiguration::eqmount_config(EqMountServer *server,
 	char buf[256];
 	if (argn == 0) {
 		// Print all config names
-		ConfigNode *p = getInstance().head;
-		stprintf(server->getStream(), "%s", cmd);
+		ConfigNode *p = getHead();
+		svprintf(server, "%s", cmd);
 		for (; p; p = p->next) {
-			stprintf(server->getStream(), " %s", p->config->config);
+			svprintf(server, " %s", p->config->config);
 			// Get string representing the value
 //			getStringFromConfig(p->config, buf, sizeof(buf));
-//			stprintf(server->getStream(), "%s %s,%s,%s,%s\r\n", cmd,
+//			stprintf(server, "%s %s,%s,%s,%s\r\n", cmd,
 //					p->config->config, p->config->name,
 //					typeName(p->config->type), buf);
 		}
-		stprintf(server->getStream(), "\r\n");
+		svprintf(server, "\r\n");
 	} else {
 		char *config_name = argv[0]; // Name of the config in question
-		ConfigItem *config = getInstance().getConfigItem(config_name);
+		ConfigItem *config = getConfigItem(config_name);
 		if (!config) {
-			stprintf(server->getStream(), "%s Error: config %s not found\r\n",
-					cmd, config_name);
+			svprintf(server, "%s Error: config %s not found\r\n", cmd,
+					config_name);
 			return ERR_PARAM_OUT_OF_RANGE;
 		}
 		if (argn == 1) {
 			// Print value of the config
-			getStringFromConfig(config, buf, sizeof(buf));
-			stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
+			getString(config, buf, sizeof(buf));
+			svprintf(server, "%s %s\r\n", cmd, buf);
 		} else if (argn == 2) {
 			if (strcmp(argv[1], "default") == 0) {
 				// Print default value of the config
 				// TODO
 			} else if (strcmp(argv[1], "name") == 0) {
 				// Print name
-				stprintf(server->getStream(), "%s %s\r\n", cmd, config->name);
+				svprintf(server, "%s %s\r\n", cmd, config->name);
 			} else if (strcmp(argv[1], "help") == 0) {
 				// Print help
-				stprintf(server->getStream(), "%s %s\r\n", cmd, config->help);
+				svprintf(server, "%s %s\r\n", cmd, config->help);
 			} else if (strcmp(argv[1], "type") == 0) {
 				// Print type
-				stprintf(server->getStream(), "%s %s\r\n", cmd,
-						typeName(config->type));
+				svprintf(server, "%s %s\r\n", cmd, typeName(config->type));
 			} else if (strcmp(argv[1], "info") == 0) {
 				// Print type, value, name and help
-				getStringFromConfig(config, buf, sizeof(buf));
-				stprintf(server->getStream(), "%s %s,%s,%s,%s\r\n", cmd,
+				getString(config, buf, sizeof(buf));
+				svprintf(server, "%s %s,%s,%s,%s\r\n", cmd,
 						typeName(config->type), buf, config->name,
 						config->help);
 			} else if (strcmp(argv[1], "limit") == 0) {
@@ -139,59 +140,24 @@ int TelescopeConfiguration::eqmount_config(EqMountServer *server,
 						&& config->type != DATATYPE_BOOL && !config->extra) {
 					switch (config->type) {
 					case DATATYPE_INT:
-						stprintf(server->getStream(), "%s %d %d\r\n", cmd,
-								config->min.idata, config->max.idata);
+						svprintf(server, "%s %d %d\r\n", cmd, config->min.idata,
+								config->max.idata);
 						break;
 					case DATATYPE_DOUBLE:
-						stprintf(server->getStream(), "%s %.8f %.8f\r\n", cmd,
+						svprintf(server, "%s %.8f %.8f\r\n", cmd,
 								config->min.ddata, config->max.ddata);
 						break;
 					default:
 						break;
 					}
 				} else {
-					stprintf(server->getStream(),
-							"%s limit not supported for %s.\r\n", cmd,
+					svprintf(server, "%s limit not supported for %s.\r\n", cmd,
 							config->config);
 				}
 			} else {
 				// Set value
 				char *value = argv[1];
-				char *s;
-				int i;
-				double d;
-				bool b;
-				switch (config->type) {
-				case DATATYPE_INT:
-					i = strtol(value, &s, 10);
-					if (s == value || setIntToConfig(config, i)) {
-						return ERR_PARAM_OUT_OF_RANGE;
-					}
-					break;
-				case DATATYPE_DOUBLE:
-					d = strtod(value, &s);
-					if (s == value || setDoubleToConfig(config, d)) {
-						return ERR_PARAM_OUT_OF_RANGE;
-					}
-					break;
-				case DATATYPE_BOOL:
-					if (strcmp(value, "true") == 0) {
-						b = true;
-					} else if (strcmp(value, "false") == 0) {
-						b = false;
-					} else {
-						return ERR_PARAM_OUT_OF_RANGE;
-					}
-					if (setBoolToConfig(config, b)) {
-						return ERR_PARAM_OUT_OF_RANGE;
-					}
-					break;
-				case DATATYPE_STRING:
-					if (setStringToConfig(config, value)) {
-						return ERR_PARAM_OUT_OF_RANGE;
-					}
-					break;
-				}
+				setConfigAutoType(config, value);
 			}
 		}
 	}
@@ -203,16 +169,19 @@ TelescopeConfiguration::TelescopeConfiguration() {
 	int k = 0;
 	for (const ConfigItem *p = default_config; *(p->config) != '\0'; p++) {
 		r = new ConfigNode;
-		r->next = q;
+		if (!q)
+			head = r;
+		else
+			q->next = r;
+		r->next = NULL;
 		r->config = new ConfigItem(*p);
 		r->default_config = p;
 		r->key = k++;
 		q = r;
 	}
-	head = r;
 
 #ifdef NVSTORE_ENABLED
-	NVStore::get_instance().set_max_keys(64);
+	NVStore::get_instance().set_max_keys(128);
 #endif
 
 	EqMountServer::addCommand(
@@ -220,7 +189,7 @@ TelescopeConfiguration::TelescopeConfiguration() {
 					TelescopeConfiguration::eqmount_config));
 }
 
-int TelescopeConfiguration::getIntFromConfig(ConfigItem *config) {
+int TelescopeConfiguration::getInt(const ConfigItem *config) {
 	if (config->type != DATATYPE_INT) {
 		error("Data type mismatch: wanted %s, actual %s",
 				typeName(DATATYPE_INT), typeName(config->type));
@@ -228,7 +197,7 @@ int TelescopeConfiguration::getIntFromConfig(ConfigItem *config) {
 	return config->value.idata;
 }
 
-double TelescopeConfiguration::getDoubleFromConfig(ConfigItem *config) {
+double TelescopeConfiguration::getDouble(const ConfigItem *config) {
 	if (config->type != DATATYPE_DOUBLE && config->type != DATATYPE_INT) {
 		error("Data type mismatch: wanted %s, actual %s",
 				typeName(DATATYPE_DOUBLE), typeName(config->type));
@@ -237,7 +206,7 @@ double TelescopeConfiguration::getDoubleFromConfig(ConfigItem *config) {
 			config->value.ddata : config->value.idata;
 }
 
-bool TelescopeConfiguration::getBoolFromConfig(ConfigItem *config) {
+bool TelescopeConfiguration::getBool(const ConfigItem *config) {
 	if (config->type != DATATYPE_BOOL) {
 		error("Data type mismatch: wanted %s, actual %s",
 				typeName(DATATYPE_BOOL), typeName(config->type));
@@ -245,78 +214,8 @@ bool TelescopeConfiguration::getBoolFromConfig(ConfigItem *config) {
 	return config->value.bdata;
 }
 
-bool TelescopeConfiguration::setIntToConfig(ConfigItem *config, int value) {
-	if (config == NULL) {
-		debug_if(TC_DEBUG, "Null config");
-		return true;
-	}
-	if (config->type != DATATYPE_DOUBLE && config->type != DATATYPE_INT) {
-		debug_if(TC_DEBUG, "Data type mismatch: wanted %s, actual %s",
-				typeName(DATATYPE_INT), typeName(config->type));
-		return true;
-	}
-	if (config->type == DATATYPE_INT)
-		config->value.idata = value;
-	else
-		config->value.ddata = value;
-	return false;
-}
-
-bool TelescopeConfiguration::setDoubleToConfig(ConfigItem *config,
-		double value) {
-	if (config == NULL) {
-		debug_if(TC_DEBUG, "Null config");
-		return true;
-	}
-	if (config->type != DATATYPE_DOUBLE) {
-		error("Data type mismatch: wanted %s, actual %s",
-				typeName(DATATYPE_DOUBLE), typeName(config->type));
-		return true;
-	}
-	config->value.ddata = value;
-	return false;
-}
-
-bool TelescopeConfiguration::setBoolToConfig(ConfigItem *config, bool value) {
-	if (config == NULL) {
-		debug_if(TC_DEBUG, "Null config");
-		return true;
-	}
-	if (config->type != DATATYPE_BOOL) {
-		debug_if(TC_DEBUG, "Data type mismatch: wanted %s, actual %s",
-				typeName(DATATYPE_BOOL), typeName(config->type));
-		return true;
-	}
-	config->value.bdata = value;
-	return false;
-}
-
-bool TelescopeConfiguration::setStringToConfig(ConfigItem *config,
-		char *value) {
-	if (config == NULL) {
-		debug_if(TC_DEBUG, "Null config");
-		return true;
-	}
-	if (config->type != DATATYPE_STRING) {
-		debug_if(TC_DEBUG, "Data type mismatch: wanted %s, actual %s",
-				typeName(DATATYPE_STRING), typeName(config->type));
-		return true;
-	}
-	strncpy(config->value.strdata, value, sizeof(config->value.strdata));
-	return false;
-}
-
-ConfigItem* TelescopeConfiguration::getConfigItemCheck(const char *name) {
-	ConfigItem *config = getConfigItem(name);
-	if (!config) {
-		error("Config not found: %s", name);
-		return NULL;
-	}
-	return config;
-}
-
-char* TelescopeConfiguration::getStringFromConfig(ConfigItem *config,
-		char buf[], int len) {
+char* TelescopeConfiguration::getString(const ConfigItem *config, char buf[],
+		int len) {
 	if (!buf || len <= 0)
 		return NULL;
 	switch (config->type) {
@@ -337,87 +236,119 @@ char* TelescopeConfiguration::getStringFromConfig(ConfigItem *config,
 	return buf;
 }
 
-static void setConfigValue(ConfigItem *config, const char *value) {
-	switch (config->type) {
-	case DATATYPE_INT:
-		config->value.idata = strtol(value, NULL, 10);
-		if (!config->extra
-				&& (config->value.idata > config->max.idata
-						|| config->value.idata < config->min.idata)) {
-			error("'%s' value out of range: must be > %d and < %d",
-					config->config, config->max.idata, config->min.idata);
-		}
-		break;
-	case DATATYPE_DOUBLE:
-		config->value.ddata = strtod(value, NULL);
-		if (!config->extra
-				&& (config->value.ddata > config->max.ddata
-						|| config->value.ddata < config->min.ddata)) {
-			error("'%s' value out of range: must be > %f and < %f",
-					config->config, config->max.ddata, config->min.ddata);
-		}
-		break;
-	case DATATYPE_BOOL:
-		config->value.bdata = (strcmp(value, "true") == 0);
-		break;
-	case DATATYPE_STRING:
-		strncpy(config->value.strdata, value, sizeof(config->value.strdata));
-		break;
-	}
-}
-
-void TelescopeConfiguration::setConfigByName(const char *name,
-		const char *value) {
-	// Find the config node if it already exists
-	ConfigItem *config = getInstance().getConfigItem(name);
+void TelescopeConfiguration::setInt(ConfigItem *config, int value) {
 	if (config == NULL) {
-		if (*value == '\0') {
-			// Empty value string, don't add
-			return;
-		}
-		// Create new node
-		config = new ConfigItem;
-		config->config = new char[strlen(name) + 1];
-		strcpy(config->config, name);
-		config->help = "";
-		config->name = config->config;
-		config->extra = true;
-		ConfigNode *n = new ConfigNode, *m = getInstance().head;
-		n->config = config;
-		n->default_config = NULL;
-		// Find tail
-		while (m->next != NULL)
-			m = m->next;
-		m->next = n;
-		n->key = m->key + 1;
-		n->next = NULL;
-		if (strcmp(value, "true") == 0 || strcmp(value, "false") == 0) {
-			config->type = DATATYPE_BOOL;
-		} else if (!isalpha(value[0])) {
-			if (strchr(value, '.') == NULL) { // Look for decimal point
-				config->type = DATATYPE_INT;
-			} else {
-				config->type = DATATYPE_DOUBLE;
-			}
-		} else {
-			config->type = DATATYPE_STRING;
-		}
+		debug_ptg(DEFAULT_DEBUG, "TC: Null config");
+		return;
 	}
-	setConfigValue(config, value);
+	if (config->type != DATATYPE_DOUBLE && config->type != DATATYPE_INT) {
+		error("Data type mismatch %s: wanted %s, actual %s",
+				config->config, typeName(DATATYPE_INT), typeName(config->type));
+	}
+	if (config->type == DATATYPE_INT) {
+		if (value > config->max.idata)
+			value = config->max.idata;
+		else if (value < config->min.idata)
+			value = config->min.idata;
+		config->value.idata = value;
+	} else {
+		if (value > config->max.ddata)
+			value = floor(config->max.ddata);
+		else if (value < config->min.ddata)
+			value = ceil(config->min.ddata);
+		config->value.ddata = value;
+	}
 }
 
-ConfigItem* TelescopeConfiguration::getConfigItem(const char *name) {
+void TelescopeConfiguration::setDouble(ConfigItem *config, double value) {
+	if (config == NULL) {
+		debug_ptg(DEFAULT_DEBUG, "TC: Null config");
+		return;
+	}
+	if (config->type != DATATYPE_DOUBLE) {
+		error("Data type mismatch %s: wanted %s, actual %s",
+				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		return;
+	}
+
+	if (value > config->max.ddata)
+		value = config->max.ddata;
+	else if (value < config->min.ddata)
+		value = config->min.ddata;
+	config->value.ddata = value;
+}
+
+void TelescopeConfiguration::setBool(ConfigItem *config, bool value) {
+	if (config == NULL) {
+		debug_ptg(DEFAULT_DEBUG, "TC: Null config");
+		return;
+	}
+	if (config->type != DATATYPE_BOOL) {
+		error("Data type mismatch %s: wanted %s, actual %s",
+				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		return;
+	}
+	config->value.bdata = value;
+}
+
+void TelescopeConfiguration::setString(ConfigItem *config, const char *value) {
+	if (config == NULL) {
+		debug_ptg(DEFAULT_DEBUG, "TC: Null config");
+		return;
+	}
+	if (config->type != DATATYPE_STRING) {
+		error("Data type mismatch %s: wanted %s, actual %s",
+				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		return;
+	}
+	strncpy(config->value.strdata, value, sizeof(config->value.strdata));
+}
+
+ConfigItem* TelescopeConfiguration::addConfigItem(const char *name,
+		DataType type) {
+	ConfigItem *config;
+	// Create new node
+	config = new ConfigItem;
+	config->config = new char[strlen(name) + 1];
+	strcpy(config->config, name);
+	config->help = "";
+	config->name = config->config;
+	config->extra = true;
+	config->type = type;
+	if (config->type == DATATYPE_INT) {
+		config->max.idata = 0x7FFFFFFF; // 2^31-1
+		config->min.idata = 0x80000000; // -2^31
+	} else if (config->type == DATATYPE_DOUBLE) {
+		config->max.ddata = DBL_MAX;
+		config->min.ddata = -DBL_MAX;
+	}
+	ConfigNode *n = new ConfigNode, *m = getHead();
+	while (m->next)
+		m = m->next;
+	n->config = config;
+	n->default_config = NULL;
+	m->next = n;
+	n->key = m->key + 1;
+	n->next = NULL;
+
+	return config;
+}
+
+ConfigItem* TelescopeConfiguration::getConfigItem(const char *name,
+		bool check) {
 	ConfigNode *p;
-	for (p = head; p && (strcmp(p->config->config, name) != 0); p = p->next)
+	for (p = getHead(); p && (strcmp(p->config->config, name) != 0); p = p->next)
 		;
-	if (!p)
+	if (!p) {
+		if (check)
+			error("Config not found: %s", name);
 		return NULL;
-	else
+	} else
 		return p->config;
 }
 
 TelescopeConfiguration::~TelescopeConfiguration() {
-	for (ConfigNode *q = head; q;) {
+	for (ConfigNode *q = getHead(); q;) {
 		ConfigNode *p = q->next;
 		delete q->config;
 		delete q;
@@ -449,7 +380,7 @@ void TelescopeConfiguration::readFromFile(FILE *fp) {
 		char *q = strchr(p, '=');
 		if (q == NULL) {
 			/*Syntax error*/
-			debug("Syntax error in line %d\n", lineno);
+			error("TC: Syntax error in line %d\n", lineno);
 			continue;
 		}
 
@@ -476,14 +407,14 @@ void TelescopeConfiguration::readFromFile(FILE *fp) {
 		strncpy(value, q, s - q + 1);
 		value[s - q + 1] = '\0';
 
-		getInstance().setConfigByName(parameter, value);
+		setConfigAutoType(parameter, value);
 	}
 }
 
 void TelescopeConfiguration::writeToFile(FILE *fp) {
 	char buf[256];
-	for (ConfigNode *p = getInstance().head; p; p = p->next) {
-		getStringFromConfig(p->config, buf, sizeof(buf));
+	for (ConfigNode *p = getHead(); p; p = p->next) {
+		getString(p->config, buf, sizeof(buf));
 		fprintf(fp, "%s = %s\n", p->config->config, buf);
 	}
 }
@@ -495,10 +426,10 @@ int TelescopeConfiguration::saveConfig_NV() {
 	bool success = true;
 	NVStore &nv = NVStore::get_instance();
 
-	for (ConfigNode *p = getInstance().head; p; p = p->next) {
+	for (ConfigNode *p = getHead(); p; p = p->next) {
 		// Format of saving: [name] [value]
 		size_t len = snprintf(buf, sizeof(buf), "%s ", p->config->config);
-		getStringFromConfig(p->config, buf + len, sizeof(buf) - len);
+		getString(p->config, buf + len, sizeof(buf) - len);
 
 		if (nv.set(p->key, strlen(buf), buf) != NVSTORE_SUCCESS) {
 			success = false;
@@ -523,9 +454,161 @@ int TelescopeConfiguration::readConfig_NV() {
 		char *value = sp + 1;
 		*sp = '\0'; // Terminate name string
 		*(buf + actual_size) = '\0'; // Terminate value string
-		getInstance().setConfigByName(name, value);
+		setConfigAutoType(name, value);
 	}
 
 	return key >= sizeof(default_config) / sizeof(ConfigItem); // Success if at least all default items are set
 }
+
 #endif
+
+int TelescopeConfiguration::getInt(const char *name) {
+	ConfigItem *config = getConfigItem(name, true);
+	return getInt(config);
+}
+
+double TelescopeConfiguration::getDouble(const char *name) {
+	ConfigItem *config = getConfigItem(name, true);
+	return getDouble(config);
+}
+
+bool TelescopeConfiguration::getBool(const char *name) {
+	ConfigItem *config = getConfigItem(name, true);
+	return getBool(config);
+}
+
+char* TelescopeConfiguration::getString(const char *name, char buf[], int len) {
+	ConfigItem *config = getConfigItem(name, true);
+	return getString(config, buf, len);
+}
+
+void TelescopeConfiguration::setInt(const char *name, int value) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config) {
+		// Create new config
+		config = addConfigItem(name, DATATYPE_INT);
+		if (!config)
+			return;
+	}
+	setInt(config, value);
+}
+
+void TelescopeConfiguration::setDouble(const char *name, double value) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config) {
+		// Create new config
+		config = addConfigItem(name, DATATYPE_DOUBLE);
+		if (!config)
+			return;
+	}
+	setDouble(config, value);
+}
+
+void TelescopeConfiguration::setBool(const char *name, bool value) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config) {
+		// Create new config
+		config = addConfigItem(name, DATATYPE_BOOL);
+		if (!config)
+			return;
+	}
+	setBool(config, value);
+}
+
+void TelescopeConfiguration::setString(const char *name, const char *value) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config) {
+		// Create new config
+		config = addConfigItem(name, DATATYPE_STRING);
+		if (!config)
+			return;
+	}
+	setString(config, value);
+}
+
+void TelescopeConfiguration::setConfigAutoType(const char *name,
+		const char *value) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config) {
+		DataType type;
+		if (strcmp(value, "true") == 0 || strcmp(value, "false") == 0) {
+			type = DATATYPE_BOOL;
+		} else {
+			char *tail;
+			strtol(value, &tail, 10);
+			if (*tail == '\0') { // Successfully converted to int
+				type = DATATYPE_INT;
+			} else {
+				strtod(value, &tail);
+				if (*tail == '\0') { // Successfully converted to double
+					type = DATATYPE_DOUBLE;
+				} else {
+					type = DATATYPE_STRING;
+				}
+			}
+		}
+		config = addConfigItem(name, type);
+		if (!config)
+			return;
+	}
+	setConfigAutoType(config, value);
+}
+
+void TelescopeConfiguration::setConfigAutoType(ConfigItem *config, const char *value) {
+	switch (config->type) {
+	case DATATYPE_INT:
+		setInt(config, strtol(value, NULL, 10));
+		break;
+	case DATATYPE_DOUBLE:
+		setDouble(config, strtod(value, NULL));
+		break;
+	case DATATYPE_BOOL:
+		setBool(config, (strcmp(value, "true") == 0));
+		break;
+	case DATATYPE_STRING:
+		setString(config, value);
+		break;
+	}
+}
+
+bool TelescopeConfiguration::isConfigExist(const char *name) {
+	return getConfigItem(name) != NULL;
+}
+
+bool TelescopeConfiguration::getIntLimit(const char *name, int &min, int &max) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config || config->type != DATATYPE_INT)
+		return false;
+	min = config->min.idata;
+	max = config->max.idata;
+	return true;
+}
+
+bool TelescopeConfiguration::getDoubleLimit(const char *name, double &min,
+		double &max) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config || config->type != DATATYPE_DOUBLE)
+		return false;
+	min = config->min.ddata;
+	max = config->max.ddata;
+	return true;
+}
+
+bool TelescopeConfiguration::setIntLimit(const char *name, int min, int max) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config || config->type != DATATYPE_INT)
+		return false;
+	config->min.idata = min;
+	config->max.idata = max;
+	return true;
+}
+
+bool TelescopeConfiguration::setDoubleLimit(const char *name, double min,
+		double max) {
+	ConfigItem *config = getConfigItem(name);
+	if (!config || config->type != DATATYPE_DOUBLE)
+		return false;
+	config->min.ddata = min;
+	config->max.ddata = max;
+	return true;
+}

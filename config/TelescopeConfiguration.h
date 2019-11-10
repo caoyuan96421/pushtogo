@@ -10,8 +10,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "CelestialMath.h"
-#include "EqMountServer.h"
+#include "pushtogo.h"
 
 #ifdef NVSTORE_ENABLED
 #include "nvstore.h"
@@ -39,6 +38,13 @@ struct ConfigItem {
 	bool extra;
 };
 
+struct ConfigNode {
+	int key;
+	ConfigItem *config;
+	const ConfigItem *default_config;
+	ConfigNode *next;
+};
+
 class EqMountServer;
 
 /**
@@ -54,66 +60,50 @@ public:
 	static int readConfig_NV();
 #endif
 
-	static int getInt(const char *name) {
-		return getIntFromConfig(getInstance().getConfigItemCheck(name));
-	}
-	static double getDouble(const char *name) {
-		return getDoubleFromConfig(getInstance().getConfigItemCheck(name));
-	}
-	static bool getBool(const char *name) {
-		return getBoolFromConfig(getInstance().getConfigItemCheck(name));
-	}
-	static char* getString(const char *name, char buf[], int len) {
-		return getStringFromConfig(getInstance().getConfigItemCheck(name), buf,
-				len);
-	}
-	static void setInt(const char *name, int value) {
-		setIntToConfig(getInstance().getConfigItemCheck(name), value);
-	}
-	static void setDouble(const char *name, double value) {
-		setDoubleToConfig(getInstance().getConfigItemCheck(name), value);
-	}
-	static void setBool(const char *name, bool value) {
-		setBoolToConfig(getInstance().getConfigItemCheck(name), value);
-	}
-	static void setString(const char *name, char *value) {
-		setStringToConfig(getInstance().getConfigItemCheck(name), value);
-	}
+	static int getInt(const char *name);
+	static double getDouble(const char *name);
+	static bool getBool(const char *name);
+	static char* getString(const char *name, char buf[], int len);
 
-	static bool isConfigExist(const char *name){
-		return getInstance().getConfigItem(name) == NULL;
+	static int getInt(const ConfigItem *config);
+	static double getDouble(const ConfigItem *config);
+	static bool getBool(const ConfigItem *config);
+	static char* getString(const ConfigItem *config, char buf[], int len);
+
+	static bool getIntLimit(const char *name, int &min, int &max);
+	static bool getDoubleLimit(const char *name, double &min, double &max);
+
+	static void setInt(const char *name, int value);
+	static void setDouble(const char *name, double value);
+	static void setBool(const char *name, bool value);
+	static void setString(const char *name, const char *value);
+	static void setConfigAutoType(const char *name, const char *value);
+
+	static void setInt(ConfigItem *config, int value);
+	static void setDouble(ConfigItem *config, double value);
+	static void setBool(ConfigItem *config, bool value);
+	static void setString(ConfigItem *config, const char *value);
+	static void setConfigAutoType(ConfigItem *config, const char *value);
+
+	static bool setIntLimit(const char *name, int min, int max);
+	static bool setDoubleLimit(const char *name, double min, double max);
+
+	static bool isConfigExist(const char *name);
+//		return getInstance().getConfigItem(name) == NULL;
+
+	static ConfigNode *getHead() {
+		static TelescopeConfiguration instance;
+		return instance.head;
 	}
 
 private:
+	static ConfigNode *head;
+
 	TelescopeConfiguration();
 	~TelescopeConfiguration();
 
-	struct ConfigNode {
-		int key;
-		ConfigItem *config;
-		const ConfigItem *default_config;
-		ConfigNode *next;
-	} *head;
-
-	static TelescopeConfiguration& getInstance() {
-		static TelescopeConfiguration instance;
-		return instance;
-	}
-
-	ConfigItem* getConfigItem(const char *name);
-	ConfigItem* getConfigItemCheck(const char *name);
-
-	void setConfigByName(const char *name, const char *value);
-
-	static int getIntFromConfig(ConfigItem*);
-	static double getDoubleFromConfig(ConfigItem*);
-	static bool getBoolFromConfig(ConfigItem*);
-	static char* getStringFromConfig(ConfigItem*, char buf[], int len);
-
-	static bool setIntToConfig(ConfigItem*, int value);
-	static bool setDoubleToConfig(ConfigItem*, double value);
-	static bool setBoolToConfig(ConfigItem*, bool value);
-	static bool setStringToConfig(ConfigItem*, char *value);
+	static ConfigItem* getConfigItem(const char *name, bool check = false);
+	static ConfigItem* addConfigItem(const char *name, DataType config_type);
 
 	static int eqmount_config(EqMountServer *server, const char *cmd, int argn,
 			char *argv[]);

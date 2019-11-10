@@ -8,11 +8,7 @@
 #ifndef _AXIS_H_
 #define _AXIS_H_
 #include "mbed.h"
-#include "StepperMotor.h"
-#include "CelestialMath.h"
-#include "PEC.h"
-#include "Encoder.h"
-#include "config/TelescopeConfiguration.h"
+#include "pushtogo.h"
 
 //#define AXIS_SLEW_SIGNAL				0x00010000
 #define AXIS_GUIDE_SIGNAL				0x00020000
@@ -49,8 +45,6 @@ typedef enum {
 	FINISH_EMERG_STOPPED = 2,
 	FINISH_ERROR = 4
 } finishstate_t;
-
-class PEC;
 
 /** General Rotating Axis class
  * Handles low-level stepper timing, calculates the speed and distance to rotate
@@ -212,6 +206,7 @@ public:
 	 */
 	bool isGuiding() const;
 
+
 	PEC* getPEC();
 
 	void setPEC(PEC *pec);
@@ -219,6 +214,18 @@ public:
 	bool isPECEnabled() const;
 
 	void setPECEnabled(bool pecEnabled);
+
+	double getEncoderOffset() const {
+		return encoder_offset;
+	}
+
+	void setEncoderOffset(double encoderOffset) {
+		encoder_offset = encoderOffset;
+	}
+
+	Encoder* getEncoder() {
+		return encoder;
+	}
 
 protected:
 
@@ -254,6 +261,7 @@ protected:
 	volatile finishstate_t slew_finish_state; /// Finish state of slew
 	Timer tim; /// Timer
 	bool guiding; /// isGuiding
+	double encoder_offset;
 
 	PEC *pec; /// PEC
 	bool pecEnabled; /// Is pec enabled
@@ -264,6 +272,9 @@ protected:
 	void slew(axisrotdir_t dir, double dest, bool indefinite,
 			bool useCorrection);
 	void track(axisrotdir_t dir);
+
+	// Sync encoder and motor counts
+	void sync_count();
 
 	/*These functions can be overriden to provide mode selection before each type of operation is performed, such as microstepping and current setting*/
 

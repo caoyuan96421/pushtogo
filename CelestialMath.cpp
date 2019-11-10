@@ -10,8 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mbed.h"
-
-#define CM_DEBUG 0
+#include "debug.h"
 
 static inline double clamp(double x) {
 	return (x > 1) ? 1 : ((x < -1) ? -1 : x);
@@ -372,16 +371,16 @@ double alignTwoStars(const AlignmentStar stars[],
 		offset.ra_off += -dp4;
 
 		residue = sqrt(f1 * f1 + f2 * f2 + f3 * f3 + f4 * f4); // calculate the difference
-		debug_if(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\tdiff=%f\t %e %e\n", i,
+		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\tdiff=%f\t %e %e\n", i,
 				pa.alt, pa.azi, offset.dec_off, offset.ra_off, residue, det,
 				det * (i11 * i22 - i12 * i21));
 	}
 	if (diverge) {
 		/// Do something
-		debug_if(CM_DEBUG, "Diverge\n");
+		debug_ptg(CM_DEBUG, "Diverge\n");
 		return INFINITY;
 	}
-	debug_if(CM_DEBUG, "Final delta: %.2e\n", residue);
+	debug_ptg(CM_DEBUG, "Final delta: %.2e\n", residue);
 	return residue;
 }
 
@@ -569,22 +568,22 @@ double alignNStars(const int N, const AlignmentStar stars[],
 		cone += dp[4];
 
 		if (newresidue >= residue - tol) {
-			debug_if(CM_DEBUG, "Converged.\n");
+			debug_ptg(CM_DEBUG, "Converged.\n");
 			diverge = false;
 			break;
 		} else {
 			residue = newresidue;
 		}
-		debug_if(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\t%f\tr=%f\n", i,
+		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\t%f\tr=%f\n", i,
 				pa.alt, pa.azi, offset.dec_off, offset.ra_off, cone, residue);
 	}
 
 	if (diverge) {
-		debug_if(CM_DEBUG, "Diverged.\n");
+		debug_ptg(CM_DEBUG, "Diverged.\n");
 		return INFINITY;
 	}
 
-	debug_if(CM_DEBUG, "Final result: %f\t%f\t%f\t%f\t%f\tr=%f\n", pa.alt,
+	debug_ptg(CM_DEBUG, "Final result: %f\t%f\t%f\t%f\t%f\tr=%f\n", pa.alt,
 			pa.azi, offset.dec_off, offset.ra_off, cone, residue);
 	return residue;
 

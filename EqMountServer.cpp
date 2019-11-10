@@ -9,19 +9,23 @@
 #include "mbed_events.h"
 #include <ctype.h>
 #include <time.h>
-
-#define EMS_DEBUG 0
+#include "printf.h"
 
 extern ServerCommand commandlist[MAX_COMMAND];
 
-void stprintf(FileHandle &f, const char *fmt, ...) {
-	char buf[1024];
+void svprintf(EqMountServer *server, const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	int len = vsnprintf(buf, sizeof(buf), fmt, args);
+	server->vfprint(fmt, args);
 	va_end(args);
+}
 
-	f.write(buf, len);
+void EqMountServer::vfprint(const char *fmt, va_list arg) {
+	char buf[1024];
+	int len = vsnprintf(buf, sizeof(buf), fmt, arg);
+	stream_mutex.lock();
+	stream.write(buf, len);
+	stream_mutex.unlock();
 }
 
 EqMountServer::EqMountServer(FileHandle &stream, bool echo) :
@@ -44,7 +48,7 @@ void EqMountServer::task_thread() {
 		const int size = 256;
 		char *buffer = new char[size]; // text buffer
 		if (!buffer) {
-			stprintf(stream, "Error: out of memory\r\n");
+			error("EqMountServer: out of memory\r\n");
 			break;
 		}
 		char x = 0;
@@ -58,7 +62,7 @@ void EqMountServer::task_thread() {
 				break;
 			} else if (x == '\b' || x == '\x7F') { // Backspace
 				if (i > 0) {
-					stprintf(stream, "\b \b"); // blank the current character properly
+					svprintf(this, "\b \b"); // blank the current character properly
 					i--;
 				}
 				continue;
@@ -75,7 +79,7 @@ void EqMountServer::task_thread() {
 		}
 		if (echo) {
 			// Echo new line character after command
-			stprintf(stream, "\r\n");
+			svprintf(this, "\r\n");
 		}
 		if (i == 0) { // Empty command
 			delete[] buffer;
@@ -84,7 +88,7 @@ void EqMountServer::task_thread() {
 		buffer[i] = '\0'; // insert null character
 
 		if (eq_mount == NULL) {
-			stprintf(stream, "Error: EqMount not binded.\r\n");
+			svprintf(this, "Error: EqMount not binded.\r\n");
 			delete[] buffer;
 			continue;
 		}
@@ -114,13 +118,12 @@ void EqMountServer::task_thread() {
 
 		int argn = i;
 
-		debug_if(EMS_DEBUG, "command: |%s| ", command);
+		debug_ptg(SVR_DEBUG, "command: |%s|\r\n", command);
 		for (i = 0; i < argn; i++) {
-			debug_if(EMS_DEBUG, "|%s| ", args[i]);
+			debug_ptg(SVR_DEBUG, "  arg[%i]=|%s|\r\n", i, args[i]);
 			for (char *p = args[i]; *p; ++p)
 				*p = tolower(*p); // Convert to lowercase
 		}
-		debug_if(EMS_DEBUG, "\n");
 
 		int cind = -1;
 
@@ -132,8 +135,8 @@ void EqMountServer::task_thread() {
 		}
 
 		if (cind == -1) {
-			debug_if(EMS_DEBUG, "Error: command %s not found.\n", command);
-			stprintf(stream, "Unknown command %s\r\n", command);
+			debug_ptg(SVR_DEBUG, "Error: command %s not found.\r\n", command);
+			svprintf(this, "Unknown command %s\r\n", command);
 			delete[] buffer;
 			delete[] args;
 			continue;
@@ -143,7 +146,7 @@ void EqMountServer::task_thread() {
 		if (cind < 8 || strcmp(command, "config") == 0) {
 			int ret = commandlist[cind].fptr(this, command, argn, args);
 			// Send the return status back
-			stprintf(stream, "%d %s\r\n", ret, command);
+			svprintf(this, "%d %s\r\n", ret, command);
 			delete[] buffer;
 			delete[] args;
 			continue;
@@ -153,7 +156,7 @@ void EqMountServer::task_thread() {
 		Callback<void(ServerCommand&, int, char**, char*)> cb = callback(this,
 				&EqMountServer::command_execute);
 		while (queue.call(cb, commandlist[cind], argn, args, buffer) == 0) { // Use the event dispatching thread to run this
-			debug("Event queue full. Wait...\r\n");
+			debug_ptg(SVR_DEBUG, "Event queue full. Wait...\r\n");
 			ThisThread::sleep_for(100);
 		}
 
@@ -167,16 +170,16 @@ void EqMountServer::command_execute(ServerCommand &cmd, int argn, char *args[],
 
 	if (ret == ERR_WRONG_NUM_PARAM) {
 		// Wrong number of arguments
-		debug_if(EMS_DEBUG, "Error: %s wrong number of args.\n", cmd.cmd);
+		debug_ptg(SVR_DEBUG, "Error: %s wrong number of args.\r\n", cmd.cmd);
 	} else if (ret == 2) {
 		// Wrong number of arguments
-		debug_if(EMS_DEBUG, "Error: %s parameters out of range.\n", cmd.cmd);
+		debug_ptg(SVR_DEBUG, "Error: %s parameters out of range.\r\n", cmd.cmd);
 	} else if (ret) {
-		debug_if(EMS_DEBUG, "Error: %s returned code %d.\n", cmd.cmd, ret);
+		debug_ptg(SVR_DEBUG, "Error: %s returned code %d.\r\n", cmd.cmd, ret);
 	}
 
 	// Send the return status back
-	stprintf(stream, "%d %s\r\n", ret, cmd.cmd);
+	svprintf(this, "%d %s\r\n", ret, cmd.cmd);
 
 	delete[] buffer;
 	delete[] args;
@@ -284,7 +287,7 @@ static int eqmount_speed(EqMountServer *server, const char *cmd, int argn,
 		} else {
 			return ERR_PARAM_OUT_OF_RANGE;
 		}
-		stprintf(server->getStream(), "%s %f\r\n", cmd, speed);
+		svprintf(server, "%s %f\r\n", cmd, speed);
 	} else if (argn == 2) {
 		char *tp;
 		double speed = strtod(argv[1], &tp);
@@ -318,7 +321,7 @@ static int eqmount_speed(EqMountServer *server, const char *cmd, int argn,
 static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 		char *argv[]) {
 	if (argn == 0) {
-		stprintf(server->getStream(),
+		svprintf(server,
 				"%s usage: align add [star]\r\nalign replace [n] [star]\r\nalign delete [n]\r\nalign show\r\nalign show [n]\r\nalign clear\r\nalign set\r\nalign force\r\nalign update\r\n",
 				cmd);
 		return ERR_WRONG_NUM_PARAM;
@@ -326,7 +329,7 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 	if (strcmp(argv[0], "add") == 0) {
 		AlignmentStar as;
 		if (argn != 3 && argn != 5) {
-			stprintf(server->getStream(),
+			svprintf(server,
 					"%s usage: align add {ref_ra} {ref_dec}\r\n%s usage: align add {ref_ra} {ref_dec} {meas_ra} {meas_dec}\r\n",
 					cmd, cmd);
 			return ERR_WRONG_NUM_PARAM;
@@ -358,7 +361,7 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 	} else if (strcmp(argv[0], "replace") == 0) {
 		AlignmentStar as;
 		if (argn != 4 && argn != 6) {
-			stprintf(server->getStream(),
+			svprintf(server,
 					"%s usage: align replace [index] {ref_ra} {ref_dec}\r\n%s usage: align replace [index] {ref_ra} {ref_dec} {meas_ra} {meas_dec}\r\n",
 					cmd, cmd);
 			return ERR_WRONG_NUM_PARAM;
@@ -407,19 +410,19 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 		return ret;
 	} else if (strcmp(argv[0], "show") == 0) {
 		if (argn == 1) {
-			stprintf(server->getStream(), "%s offset %.8f %.8f\r\n", cmd,
+			svprintf(server, "%s offset %.8f %.8f\r\n", cmd,
 					server->getEqMount()->getCalibration().offset.ra_off,
 					server->getEqMount()->getCalibration().offset.dec_off);
-			stprintf(server->getStream(), "%s pa %.8f %.8f\r\n", cmd,
+			svprintf(server, "%s pa %.8f %.8f\r\n", cmd,
 					server->getEqMount()->getCalibration().pa.alt,
 					server->getEqMount()->getCalibration().pa.azi);
-			stprintf(server->getStream(), "%s cone %.8f\r\n", cmd,
+			svprintf(server, "%s cone %.8f\r\n", cmd,
 					server->getEqMount()->getCalibration().cone);
-			stprintf(server->getStream(), "%s error %g\r\n", cmd,
+			svprintf(server, "%s error %g\r\n", cmd,
 					server->getEqMount()->getCalibration().error);
 		} else if (argn == 2) {
 			if (strcmp(argv[1], "num") == 0) {
-				stprintf(server->getStream(), "%s %d\r\n", cmd,
+				svprintf(server, "%s %d\r\n", cmd,
 						server->getEqMount()->getNumAlignmentStar());
 			} else {
 				char *tp;
@@ -434,7 +437,7 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 				if (!as) {
 					return ERR_PARAM_OUT_OF_RANGE;
 				}
-				stprintf(server->getStream(), "%s %.8f %.8f %.8f %.8f %d\r\n",
+				svprintf(server, "%s %.8f %.8f %.8f %.8f %d\r\n",
 						cmd, as->star_ref.ra, as->star_ref.dec,
 						as->star_meas.ra_delta, as->star_meas.dec_delta,
 						as->timestamp);
@@ -465,20 +468,20 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 			EquatorialCoordinates eq =
 					server->getEqMount()->convertToEqCoordinates(
 							MountCoordinates(dec, ra));
-			stprintf(server->getStream(), "%s %.8f %.8f\r\n", cmd, eq.ra,
+			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra,
 					eq.dec);
 		} else if (strcmp(argv[1], "eq") == 0) {
 			// Convert to eq
 			MountCoordinates mc =
 					server->getEqMount()->convertToMountCoordinates(
 							EquatorialCoordinates(dec, ra));
-			stprintf(server->getStream(), "%s %.8f %.8f\r\n", cmd, mc.ra_delta,
+			svprintf(server, "%s %.8f %.8f\r\n", cmd, mc.ra_delta,
 					mc.dec_delta);
 		} else
 			return ERR_PARAM_OUT_OF_RANGE;
 	} else if (strcmp(argv[0], "set") == 0) {
 		if (argn != 6) {
-			stprintf(server->getStream(),
+			svprintf(server,
 					"%s usage: align set [offset_ra] [offset_dec] [pa_alt] [pa_az] [cone]\r\n",
 					cmd);
 			return ERR_WRONG_NUM_PARAM;
@@ -571,16 +574,16 @@ static int eqmount_read(EqMountServer *server, const char *cmd, int argn,
 	if (argn == 0) {
 		EquatorialCoordinates eq =
 				server->getEqMount()->getEquatorialCoordinates();
-		stprintf(server->getStream(), "%s %.8f %.8f\r\n", cmd, eq.ra, eq.dec);
+		svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra, eq.dec);
 	} else if (argn == 1) {
 		if (strcmp(argv[0], "eq") == 0) {
 			EquatorialCoordinates eq =
 					server->getEqMount()->getEquatorialCoordinates();
-			stprintf(server->getStream(), "%s %.8f %.8f\r\n", cmd, eq.ra,
+			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra,
 					eq.dec);
 		} else if (strcmp(argv[0], "mount") == 0) {
 			MountCoordinates mc = server->getEqMount()->getMountCoordinates();
-			stprintf(server->getStream(), "%s %.8f %.8f %c\r\n", cmd,
+			svprintf(server, "%s %.8f %.8f %c\r\n", cmd,
 					mc.ra_delta, mc.dec_delta,
 					(mc.side == PIER_SIDE_WEST) ? 'W' : 'E');
 		} else {
@@ -620,7 +623,7 @@ static int eqmount_state(EqMountServer *server, const char *cmd, int argn,
 		default:
 			s = "undefined";
 		}
-		stprintf(server->getStream(), "%s %s\r\n", cmd, s);
+		svprintf(server, "%s %s\r\n", cmd, s);
 	} else {
 		return ERR_WRONG_NUM_PARAM;
 	}
@@ -630,11 +633,11 @@ static int eqmount_state(EqMountServer *server, const char *cmd, int argn,
 
 static int eqmount_help(EqMountServer *server, const char *cmd, int argn,
 		char *argv[]) {
-	stprintf(server->getStream(), "%s Available commands: \r\n", cmd);
+	svprintf(server, "%s Available commands: \r\n", cmd);
 	for (int i = 0; i < MAX_COMMAND; i++) {
 		if (commandlist[i].fptr == NULL)
 			break;
-		stprintf(server->getStream(), "%s - %s : %s\r\n", cmd,
+		svprintf(server, "%s - %s : %s\r\n", cmd,
 				commandlist[i].cmd, commandlist[i].desc);
 	}
 	return 0;
@@ -644,7 +647,7 @@ static int eqmount_guide(EqMountServer *server, const char *cmd, int argn,
 		char *argv[]) {
 
 	if (argn != 2) {
-		stprintf(server->getStream(),
+		svprintf(server,
 				"%s Usage: guide {north|west|south|east} milliseconds\r\n",
 				cmd);
 		return ERR_WRONG_NUM_PARAM;
@@ -682,7 +685,7 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 	} else if (argn == 1) {
 		if (strcmp(argv[0], "stamp") == 0) { // Read timestamp
 			// Print timestamp value
-			stprintf(server->getStream(), "%s %d\r\n", cmd, (uint32_t) t);
+			svprintf(server, "%s %d\r\n", cmd, (uint32_t) t);
 			return 0;
 		} else if (strcmp(argv[0], "sidereal") == 0) { // Read sidereal time (-180~180)
 			// Print sidereal time at current location
@@ -692,8 +695,8 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 //			int hh = ((int) floor(st / 15) + 24) % 24;
 //			int mm = (int) floor((st + 360.0 - hh * 15) * 4) % 60;
 //			int ss = (int) floor((st + 360.0 - hh * 15 - mm * 0.25) * 240) % 60;
-			stprintf(server->getStream(), "%s %f\r\n", cmd, st);
-//			stprintf(server->getStream(), "%d:%d:%d LST\r\n", hh, mm, ss);
+			svprintf(server, "%s %f\r\n", cmd, st);
+//			stprintf(server, "%d:%d:%d LST\r\n", hh, mm, ss);
 			return 0;
 		} else if (strcmp(argv[0], "local") == 0) { // Read local time (at longitude)
 			t += (int) (remainder(server->getEqMount()->getLocation().lon, 360)
@@ -708,7 +711,7 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 			core_util_critical_section_exit();
 #endif
 
-			stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
+			svprintf(server, "%s %s\r\n", cmd, buf);
 			return 0;
 		} else if (strcmp(argv[0], "zone") == 0) { // Read time zone
 			t += (int) (TelescopeConfiguration::getInt("timezone") * 3600);
@@ -722,10 +725,10 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 			core_util_critical_section_exit();
 #endif
 
-			stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
+			svprintf(server, "%s %s\r\n", cmd, buf);
 			return 0;
 		} else if (strcmp(argv[0], "hr") == 0){ // Read high resolution timestamp
-			stprintf(server->getStream(), "%s %.3f\r\n", cmd, server->getEqMount()->getClock().getTimeHighResolution());
+			svprintf(server, "%s %.3f\r\n", cmd, server->getEqMount()->getClock().getTimeHighResolution());
 			return 0;
 		}
 
@@ -742,7 +745,7 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 	core_util_critical_section_exit();
 #endif
 
-	stprintf(server->getStream(), "%s %s\r\n", cmd, buf);
+	svprintf(server, "%s %s\r\n", cmd, buf);
 
 	return 0;
 }
@@ -777,7 +780,7 @@ static int eqmount_settime(EqMountServer *server, const char *cmd, int argn,
 
 		server->getEqMount()->getClock().setTime(t);
 	} else {
-		stprintf(server->getStream(),
+		svprintf(server,
 				"%s usage: settime <timestamp>, or, settime <year> <month> <day> <hour> <minute> <second> (UTC time should be used)\r\n",
 				cmd);
 		return 1;
@@ -791,7 +794,7 @@ void EqMountServer::addCommand(const ServerCommand& cmd) {
 	while (i < MAX_COMMAND && commandlist[i].fptr != NULL)
 		i++;
 	if (i >= MAX_COMMAND - 1) {
-		debug("Error: max command reached.\n");
+		error("EqMountServer: max command reached.\r\n");
 		return;
 	}
 

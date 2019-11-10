@@ -1,16 +1,12 @@
 #ifndef _EQUATORIALMOUNT_H_
 #define _EQUATORIALMOUNT_H_
-#include "Axis.h"
+
+#include "mbed.h"
 #include "Mount.h"
-#include "UTCClock.h"
-#include "LocationProvider.h"
-#include "CelestialMath.h"
-#include "PEC.h"
+#include "pushtogo.h"
+
 
 #define MAX_AS_N 10 // Max number of alignment stars
-
-class Axis;
-class PEC;
 
 /**
  * Direction of nudge
@@ -323,15 +319,15 @@ public:
 	double getGuideSpeedSidereal();
 
 	/**
+	 * Set current mount coordinate to be the index position of the encoder, and write to NV Memory if possible
+	 * Has effect only if both RA and DEC encoders are enabled
+	 */
+	void setEncoderIndex();
+
+	/**
 	 * Print current position to stream. 
 	 */
-	void printPosition(FILE *stream = stdout) {
-		fprintf(stream, "Mount: RA=%7.2f, DEC=%7.2f %c\n", curr_pos.ra_delta,
-				curr_pos.dec_delta,
-				(curr_pos.side == PIER_SIDE_WEST) ? 'W' : 'E');
-		fprintf(stream, "EQ:    RA=%7.2f, DEC=%7.2f\n", curr_pos_eq.ra,
-				curr_pos_eq.dec);
-	}
+	void printPosition();
 
 	/**
 	 * Update current pointing direction from low-level encoders/counters.

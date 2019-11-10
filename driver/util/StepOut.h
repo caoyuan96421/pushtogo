@@ -19,7 +19,7 @@ class StepOut: protected PwmOut
 public:
 
 	StepOut(PinName pin) :
-			PwmOut(pin), stepCount(0), freq(1000000), status(IDLE)
+			PwmOut(pin), stepCount(0), freq(0), status(IDLE)
 	{
 		// Stop the output
 		output_off();
