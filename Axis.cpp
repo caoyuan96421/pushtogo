@@ -135,19 +135,42 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 	slewState = AXIS_NOT_SLEWING;
 	slew_finish_state = FINISH_COMPLETE;
 	currentDirection = dir;
-	stepdir_t sd = (dir == AXIS_ROTATE_POSITIVE) ? STEP_FORWARD : STEP_BACKWARD;
 
 	/* Calculate the angle to rotate*/
 	bool skip_slew = false;
 	double angleDeg = getAngleDeg();
 	double delta;
-	delta = (dest - angleDeg) * (dir == AXIS_ROTATE_POSITIVE ? 1 : -1); /*delta is the actual angle to rotate*/
-	if (fabs(delta) < 1e-5) { // FIX: delta 0->360degrees when angleDeg is essentially equal to dest
-		delta = 0;
+	stepdir_t sd;
+
+	// Determine the direction to rotate if not explicitly specified
+	if (dir == AXIS_ROTATE_CLOSEST){
+		// Choose closer direction to rotate
+		if (remainder(dest-angleDeg, 360.0) > 0) {
+			dir = AXIS_ROTATE_POSITIVE;
+		}
+		else {
+			dir = AXIS_ROTATE_NEGATIVE;
+		}
 	}
-	delta = remainder(delta - 180.0, 360.0) + 180.0; /*Shift to 0-360 deg*/
+	else if (dir == AXIS_ROTATE_CLAMPED){
+		// Always rotate within -180~180 degree
+		if (remainder(dest, 360.0) > remainder(angleDeg, 360.0)) {
+			dir = AXIS_ROTATE_POSITIVE;
+		}
+		else {
+			dir = AXIS_ROTATE_NEGATIVE;
+		}
+	}
+
+	sd = (dir == AXIS_ROTATE_POSITIVE) ? STEP_FORWARD : STEP_BACKWARD;
+	delta = (dest - angleDeg) * (dir == AXIS_ROTATE_POSITIVE ? 1 : -1); /*delta is the actual angle to rotate*/
+	if (fabs(delta) < 1e-5) // FIX: delta 0->360degrees when angleDeg is essentially equal to dest
+		delta = 0;
+	else
+		delta = remainder(delta - 180.0, 360.0) + 180.0; /*Shift to 0-360 deg*/
 	debug_ptg(AXIS_DEBUG, "%s: start=%f, end=%f, delta=%f\r\n", axisName, angleDeg,
 			dest, delta);
+
 
 	double startSpeed = 0;
 	double endSpeed = slewSpeed, waitTime;

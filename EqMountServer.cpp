@@ -40,8 +40,8 @@ EqMountServer::~EqMountServer() {
 
 void EqMountServer::task_thread() {
 	EventQueue queue(16 * EVENTS_EVENT_SIZE);
-	Thread evq_thd(osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE, NULL,
-			"EqMountServer dispatcher");
+	Thread evq_thd(osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE,
+			NULL, "EqMountServer dispatcher");
 	evq_thd.start(callback(&queue, &EventQueue::dispatch_forever));
 
 	while (true) {
@@ -96,7 +96,7 @@ void EqMountServer::task_thread() {
 		char delim[] = " "; // Delimiter, can be any white character in the actual input
 		char *saveptr;
 
-		char * command = strtok_r(buffer, delim, &saveptr); // Get the first token
+		char *command = strtok_r(buffer, delim, &saveptr); // Get the first token
 
 		if (command == NULL || strlen(command) == 0) { // Empty command
 			delete[] buffer;
@@ -437,8 +437,8 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 				if (!as) {
 					return ERR_PARAM_OUT_OF_RANGE;
 				}
-				svprintf(server, "%s %.8f %.8f %.8f %.8f %d\r\n",
-						cmd, as->star_ref.ra, as->star_ref.dec,
+				svprintf(server, "%s %.8f %.8f %.8f %.8f %d\r\n", cmd,
+						as->star_ref.ra, as->star_ref.dec,
 						as->star_meas.ra_delta, as->star_meas.dec_delta,
 						as->timestamp);
 			}
@@ -468,8 +468,7 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 			EquatorialCoordinates eq =
 					server->getEqMount()->convertToEqCoordinates(
 							MountCoordinates(dec, ra));
-			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra,
-					eq.dec);
+			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra, eq.dec);
 		} else if (strcmp(argv[1], "eq") == 0) {
 			// Convert to eq
 			MountCoordinates mc =
@@ -579,13 +578,11 @@ static int eqmount_read(EqMountServer *server, const char *cmd, int argn,
 		if (strcmp(argv[0], "eq") == 0) {
 			EquatorialCoordinates eq =
 					server->getEqMount()->getEquatorialCoordinates();
-			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra,
-					eq.dec);
+			svprintf(server, "%s %.8f %.8f\r\n", cmd, eq.ra, eq.dec);
 		} else if (strcmp(argv[0], "mount") == 0) {
 			MountCoordinates mc = server->getEqMount()->getMountCoordinates();
-			svprintf(server, "%s %.8f %.8f %c\r\n", cmd,
-					mc.ra_delta, mc.dec_delta,
-					(mc.side == PIER_SIDE_WEST) ? 'W' : 'E');
+			svprintf(server, "%s %.8f %.8f %c\r\n", cmd, mc.ra_delta,
+					mc.dec_delta, (mc.side == PIER_SIDE_WEST) ? 'W' : 'E');
 		} else {
 			return ERR_PARAM_OUT_OF_RANGE;
 		}
@@ -637,8 +634,8 @@ static int eqmount_help(EqMountServer *server, const char *cmd, int argn,
 	for (int i = 0; i < MAX_COMMAND; i++) {
 		if (commandlist[i].fptr == NULL)
 			break;
-		svprintf(server, "%s - %s : %s\r\n", cmd,
-				commandlist[i].cmd, commandlist[i].desc);
+		svprintf(server, "%s - %s : %s\r\n", cmd, commandlist[i].cmd,
+				commandlist[i].desc);
 	}
 	return 0;
 }
@@ -727,8 +724,11 @@ static int eqmount_time(EqMountServer *server, const char *cmd, int argn,
 
 			svprintf(server, "%s %s\r\n", cmd, buf);
 			return 0;
-		} else if (strcmp(argv[0], "hr") == 0){ // Read high resolution timestamp
-			svprintf(server, "%s %.3f\r\n", cmd, server->getEqMount()->getClock().getTimeHighResolution());
+		} else if (strcmp(argv[0], "hr") == 0) { // Read high resolution timestamp
+			double hr =
+					server->getEqMount()->getClock().getTimeHighResolution();
+			svprintf(server, "%s %d.%03d\r\n", cmd, int(hr),
+					int((hr - int(hr)) * 1000));
 			return 0;
 		}
 
@@ -789,7 +789,7 @@ static int eqmount_settime(EqMountServer *server, const char *cmd, int argn,
 	return 0;
 }
 
-void EqMountServer::addCommand(const ServerCommand& cmd) {
+void EqMountServer::addCommand(const ServerCommand &cmd) {
 	int i = 0;
 	while (i < MAX_COMMAND && commandlist[i].fptr != NULL)
 		i++;
@@ -813,15 +813,15 @@ ServerCommand commandlist[MAX_COMMAND] = { /// List of all commands
 		ServerCommand("align", "Star alignment", eqmount_align), /// Alignment
 		/// Above are allowed commands when another command is running
 
-		ServerCommand("goto",
-				"Perform go to operation to specified ra, dec coordinates",
-				eqmount_goto), 		/// Go to
-		ServerCommand("nudge", "Perform nudging on specified direction",
-				eqmount_nudge), 		/// Nudge
-		ServerCommand("track", "Start tracking in specified direction",
-				eqmount_track), 		/// Track
-		ServerCommand("guide", "Guide on specified direction",
-				eqmount_guide), /// Guide
-		ServerCommand("settime", "Set system time", eqmount_settime), /// System time
-		ServerCommand("", "", NULL) };
+				ServerCommand("goto",
+						"Perform go to operation to specified ra, dec coordinates",
+						eqmount_goto), 		/// Go to
+				ServerCommand("nudge", "Perform nudging on specified direction",
+						eqmount_nudge), 		/// Nudge
+				ServerCommand("track", "Start tracking in specified direction",
+						eqmount_track), 		/// Track
+				ServerCommand("guide", "Guide on specified direction",
+						eqmount_guide), /// Guide
+				ServerCommand("settime", "Set system time", eqmount_settime), /// System time
+				ServerCommand("", "", NULL) };
 

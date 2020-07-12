@@ -22,6 +22,7 @@ class StepperMotor;
 #include "PEC.h"
 #include "UTCClock.h"
 #include "LocationProvider.h"
+#include "Inclinometer.h"
 #include "CelestialMath.h"
 #include "Encoder.h"
 #include "Axis.h"

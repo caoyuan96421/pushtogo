@@ -3,7 +3,7 @@
 
 EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 		LocationProvider &loc) :
-		ra(ra), dec(dec), clock(clk), loc(loc), curr_pos(0, 0), curr_nudge_dir(
+		ra(ra), dec(dec), clock(clk), loc(loc), inclinometer(NULL), curr_pos(0, 0), curr_nudge_dir(
 				NUDGE_NONE), nudgeSpeed(0), pier_side(PIER_SIDE_EAST), num_alignment_stars(
 				0), pec(ra) {
 	south = loc.getLatitude() < 0.0;
@@ -77,26 +77,10 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 	debug_ptg(EM_DEBUG, "goTo dstmnt ra=%.2f, dec=%.2f\r\n",
 			dest_mount.ra_delta, dest_mount.dec_delta);
 
-	axisrotdir_t dec_dir, ra_dir;
-	ra_dir =
-			(remainder(dest_mount.ra_delta, 360.0)
-					> remainder(curr_pos.ra_delta, 360.0)) ?
-					AXIS_ROTATE_POSITIVE :
-			(remainder(dest_mount.ra_delta, 360.0)
-					< remainder(curr_pos.ra_delta, 360.0)) ?
-					AXIS_ROTATE_NEGATIVE : AXIS_ROTATE_STOP;
-	dec_dir =
-			(remainder(dest_mount.dec_delta, 360.0)
-					> remainder(curr_pos.dec_delta, 360.0)) ?
-					AXIS_ROTATE_POSITIVE :
-			(remainder(dest_mount.dec_delta, 360.0)
-					< remainder(curr_pos.dec_delta, 360.0)) ?
-					AXIS_ROTATE_NEGATIVE : AXIS_ROTATE_STOP;
-
 	debug_ptg(EM_DEBUG, "start slewing\r\n");
 	status = MOUNT_SLEWING;
-	ra.startSlewTo(ra_dir, dest_mount.ra_delta, withCorrection);
-	dec.startSlewTo(dec_dir, dest_mount.dec_delta, withCorrection);
+	ra.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.ra_delta - getTilt(), withCorrection);
+	dec.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.dec_delta, withCorrection);
 
 	int ret = (int) ra.waitForSlew();
 	ret |= (int) dec.waitForSlew();
@@ -329,7 +313,7 @@ void EquatorialMount::printPosition() {
 void EquatorialMount::updatePosition() {
 	// Lock the mutex to avoid race condition on the current position values
 	mutex_update.lock();
-	curr_pos = MountCoordinates(dec.getAngleDeg(), ra.getAngleDeg());
+	curr_pos = MountCoordinates(dec.getAngleDeg(), ra.getAngleDeg() + getTilt());
 	// Update Eq coordinates
 	curr_pos_eq = this->convertToEqCoordinates(curr_pos);
 	mutex_update.unlock();
@@ -485,7 +469,7 @@ void EquatorialMount::forceAlignment() {
 }
 
 void EquatorialMount::setEncoderIndex() {
-	double ra_off = ra.getAngleDeg() + ra.getEncoderOffset();
+	double ra_off = ra.getAngleDeg() + getTilt() + ra.getEncoderOffset();
 	double dec_off = dec.getAngleDeg() + dec.getEncoderOffset();
 	// Set encoder offset to cancel current mount position values
 	ra.setEncoderOffset(ra_off);
@@ -497,4 +481,13 @@ void EquatorialMount::setEncoderIndex() {
 	TelescopeConfiguration::saveConfig_NV();
 #endif
 
+}
+
+double EquatorialMount::getTilt() {
+	if (!inclinometer){
+		return 0;
+	}
+	else{
+		return inclinometer->getTilt();
+	}
 }

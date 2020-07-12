@@ -46,7 +46,11 @@ protected:
 	Mutex mutex_execution; /// Mutex to lock motion related functions
 
 	LocationProvider loc;   /// Current location (GPS coordinates)
+
 	bool south;	/// If we are in south semisphere
+
+	Inclinometer *inclinometer; /// Obtain axis tilt from accelerometer if available
+
 	MountCoordinates curr_pos; /// Current Position in mount coordinates (offset from the index positions)
 	EquatorialCoordinates curr_pos_eq; /// Current Position in the equatorial coordinates (absolute pointing direction in the sky)
 	nudgedir_t curr_nudge_dir;
@@ -204,7 +208,6 @@ public:
 	 */
 	MountCoordinates convertToMountCoordinates(
 			const EquatorialCoordinates &eq) {
-
 		LocationCoordinates l = loc.getLocation();
 		double timestamp = clock.getTimeHighResolution();
 		return eq.toLocalEquatorialCoordinates(timestamp, l).applyPolarMisalignment(
@@ -347,6 +350,23 @@ public:
 		return loc.getLocation();
 	}
 
+	Axis& getDEC() {
+		return dec;
+	}
+
+	Axis& getRA() {
+		return ra;
+	}
+
+	double getTilt();
+
+	Inclinometer* getInclinometer() {
+		return inclinometer;
+	}
+
+	void setInclinometer(Inclinometer *inclinometer) {
+		this->inclinometer = inclinometer;
+	}
 };
 
 #endif /*_EQUATORIALMOUNT_H_*/
