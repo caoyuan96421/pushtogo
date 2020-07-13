@@ -62,6 +62,7 @@ protected:
 	int num_alignment_stars;
 
 	PEC pec; /// PEC function
+	Thread thd_monitor;
 
 public:
 
@@ -367,6 +368,10 @@ public:
 	void setInclinometer(Inclinometer *inclinometer) {
 		this->inclinometer = inclinometer;
 	}
+
+private:
+
+	void task_monitor();
 };
 
 #endif /*_EQUATORIALMOUNT_H_*/

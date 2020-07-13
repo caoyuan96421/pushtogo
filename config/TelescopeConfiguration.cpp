@@ -34,13 +34,13 @@ static const char* typeName(DataType type) {
 // @formatter:off
 static const ConfigItem default_config[] =
 		{
-			{.config = const_cast<char *>("latitude"), .name = "Your latitude", .help =	"Latitude of observer, in degrees north of equator.",
+			{.config = const_cast<char *>("latitude"), .name = "Your Latitude", .help =	"Latitude of observer, in degrees north of equator.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata =0 }, .min = { .ddata = -90 }, .max = { .ddata = 90 } },
 
-			{.config =	const_cast<char *>("longitude"), .name = "Your longitude", .help =	"Longitude of observer, in degrees east of Greenwich.",
+			{.config =	const_cast<char *>("longitude"), .name = "Your Longitude", .help =	"Longitude of observer, in degrees east of Greenwich.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata = 0 }, .min = { .ddata = -180 }, .max = { .ddata = 180 } },
 
-			{.config = const_cast<char *>("timezone"),	.name = "Your timezone", .help = "Timezone in hours ahead of UTC time.",
+			{.config = const_cast<char *>("timezone"),	.name = "Your Timezone", .help = "Timezone in hours ahead of UTC time.",
 			.type =	DATATYPE_INT, .value = { .idata = 0 }, .min = {.idata = -12 }, .max = { .idata = 12 } },
 
 			{.config = const_cast<char *>("motor_steps"), .name = "Steps per Revolution",	.help =	"Motor steps/revolution.\nIf you hard-programed the microstepping, here should use total microstep resolution.",
@@ -52,38 +52,47 @@ static const ConfigItem default_config[] =
 			{.config = const_cast<char *>("worm_teeth"), .name = "Worm Teeth", .help =	"Number of teeth on the ring gear.",
 			.type =	DATATYPE_INT, .value = { .idata = 180 }, .min =	{ .idata = 1 }, .max = { .idata = 10000 } },
 
-			{ .config = const_cast<char *>("ra_use_encoder"), .name = "Use encoder on RA", .help = "Use encoder to determine RA position",
+			{ .config = const_cast<char *>("ra_use_encoder"), .name = "Use Encoder on RA", .help = "Use encoder to determine RA position",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{ .config = const_cast<char *>("dec_use_encoder"), .name = "Use encoder on DEC", .help = "Use encoder to determine DEC position",
+			{ .config = const_cast<char *>("dec_use_encoder"), .name = "Use Encoder on DEC", .help = "Use encoder to determine DEC position",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{.config = const_cast<char *>("ra_invert"), .name = "Invert RA direction", .help =	"Invert RA driving direction?\n Save and restart to take effect",
+			{.config = const_cast<char *>("ra_invert"), .name = "Invert RA Direction", .help =	"Invert RA driving direction?\n Save and restart to take effect",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{ .config = const_cast<char *>("dec_invert"), .name = "Invert DEC direction", .help = "Invert DEC driving direction?\n Save and restart to take effect",
+			{ .config = const_cast<char *>("dec_invert"), .name = "Invert DEC Direction", .help = "Invert DEC driving direction?\n Save and restart to take effect",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{.config = const_cast<char *>("ra_enc_invert"), .name = "Reverse RA encoder", .help =	"Reverse counting direction of RA encoder",
+			{.config = const_cast<char *>("ra_enc_invert"), .name = "Reverse RA Encoder", .help =	"Reverse counting direction of RA encoder",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{ .config = const_cast<char *>("dec_enc_invert"), .name = "Reverse DEC encoder", .help = "Reverse counting direction of DEC encoder",
+			{ .config = const_cast<char *>("dec_enc_invert"), .name = "Reverse DEC Encoder", .help = "Reverse counting direction of DEC encoder",
 			.type = DATATYPE_BOOL, .value = { .bdata = false } },
 
-			{.config = const_cast<char *>("goto_slew_speed"), .name = "Goto slew speed", .help = "Slewing speed used for goto, in deg/s",
+			{.config = const_cast<char *>("goto_slew_speed"), .name = "Goto Slew Speed", .help = "Slewing speed used for goto, in deg/s",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata = 2 }, .min = { .ddata = 1 }, .max = { .ddata = 10 } },
 
 			{ .config = const_cast<char *>("acceleration"), .name = "Acceleration",	.help = "Acceleration in deg/s^2.",
 			.type =	DATATYPE_DOUBLE, .value = { .ddata = 5 }, .min = { .ddata = 0.01 }, .max = { .ddata = 1000 } },
 
-			{ .config = const_cast<char *>("max_speed"), .name = "Max slewing speed", .help = "Max slewing speed. Reduce this value if losing steps.",
+			{ .config = const_cast<char *>("max_speed"), .name = "Max Slewing Speed", .help = "Max slewing speed. Reduce this value if losing steps.",
 			.type = DATATYPE_DOUBLE, .value = { .ddata = 4 }, .min = { .ddata = 1 }, .max = { .ddata = 100 } },
 
 			{ .config = const_cast<char *>("pec_granularity"), .name = "PEC Granularity", .help = "Number of PEC slots per revolution of the worm",
 			.type = DATATYPE_INT, .value = { .idata = 512 }, .min = {.idata = 32 }, .max = { .idata = 16384} },
 
-			{ .config = const_cast<char *>("serial_baud"), .name = "Baud rate", .help = "Baud rate of communication",
+			{ .config = const_cast<char *>("serial_baud"), .name = "Baud Rate", .help = "Baud rate of communication",
 			.type = DATATYPE_INT, .value = { .idata = 115200 }, .min = {.idata = 9600 }, .max = { .idata = 2000000} },
+
+			{ .config = const_cast<char *>("ra_limit"), .name = "RA Limit", .help = "Limit of RA axis below horizontal position in deg",
+			.type = DATATYPE_DOUBLE, .value = { .ddata = 20 }, .min = {.ddata = -90 }, .max = { .ddata = 90} },
+
+			{ .config = const_cast<char *>("side_pref"), .name = "Side of Pier (W=-1, E=1)", .help = "Preference of side-of-pier near meridian",
+			.type = DATATYPE_INT, .value = { .idata = 0 }, .min = {.idata = -1 }, .max = { .idata = 1} },
+
+			{ .config = const_cast<char *>("side_thd"), .name = "Side of Pier Threshold", .help = "Threshold of side-of-pier choice. Outside of this value from meridian, side-of-pier is fixed.",
+			.type = DATATYPE_DOUBLE, .value = { .ddata = 10 }, .min = {.ddata = 0 }, .max = { .ddata = 20} },
 
 			{.config = const_cast<char *>("") } };
 // @formatter:on

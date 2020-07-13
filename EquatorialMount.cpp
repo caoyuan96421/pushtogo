@@ -5,7 +5,7 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 		LocationProvider &loc) :
 		ra(ra), dec(dec), clock(clk), loc(loc), inclinometer(NULL), curr_pos(0, 0), curr_nudge_dir(
 				NUDGE_NONE), nudgeSpeed(0), pier_side(PIER_SIDE_EAST), num_alignment_stars(
-				0), pec(ra) {
+				0), pec(ra), thd_monitor(osPriorityBelowNormal, OS_STACK_SIZE, NULL, "EqMount Monitor") {
 	south = loc.getLatitude() < 0.0;
 	// Get initial transformation
 	calibration.pa = AzimuthalCoordinates(loc.getLatitude(), 0);
@@ -33,6 +33,9 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 
 	// Set in tracking mode
 	startTracking();
+
+	// Start monitor thread
+	thd_monitor.start(callback(this, &EquatorialMount::task_monitor));
 }
 
 osStatus EquatorialMount::goTo(double ra_dest, double dec_dest) {
@@ -63,7 +66,18 @@ osStatus EquatorialMount::goTo(EquatorialCoordinates dest) {
 
 osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 		bool withCorrection) {
+	double limit = TelescopeConfiguration::getDouble("ra_limit");
+	dest_mount.ra_delta -= getTilt(); // Correct tilt
+
+	// Check RA limit
+	if (!(dest_mount.ra_delta < 90 + limit && dest_mount.ra_delta > -90 - limit)){
+		// Out of limit, abort
+		debug_ptg(EM_DEBUG, "ra limit exceeded at %f (must be in %f to %f).\r\n", dest_mount.ra_delta, -90 - limit, 90 + limit);
+		return osErrorParameter;
+	}
+
 	mutex_execution.lock();
+
 	bool was_tracking = false;
 	if ((status & MOUNT_TRACKING) && !(status & MOUNT_NUDGING)) {
 		// Tracking mode
@@ -79,7 +93,7 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 
 	debug_ptg(EM_DEBUG, "start slewing\r\n");
 	status = MOUNT_SLEWING;
-	ra.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.ra_delta - getTilt(), withCorrection);
+	ra.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.ra_delta, withCorrection);
 	dec.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.dec_delta, withCorrection);
 
 	int ret = (int) ra.waitForSlew();
@@ -489,5 +503,42 @@ double EquatorialMount::getTilt() {
 	}
 	else{
 		return inclinometer->getTilt();
+	}
+}
+
+// Task for monitoring RA limit
+void EquatorialMount::task_monitor() {
+	bool triggered = false;
+	double r, limit;
+	while(true){
+		switch(status){
+		case MOUNT_SLEWING:
+		case MOUNT_TRACKING:
+		case MOUNT_TRACKING_GUIDING:
+		case MOUNT_NUDGING:
+		case MOUNT_NUDGING_TRACKING:
+			r = ra.getAngleDeg();
+			limit = TelescopeConfiguration::getDouble("ra_limit");
+
+			if (r > 90 + limit || r < -90 - limit){
+				if (!triggered){ // Avoid repeated triggering
+					// Out of limit, abort
+					debug_ptg(EM_DEBUG, "ra limit exceeded at %f (must be in %f to %f).\r\n", r, -90 - limit, 90 + limit);
+					// Stop motion
+					stopSync();
+					triggered = true;
+				}
+			}
+			else {
+				// Reset trigger
+				triggered = false;
+			}
+			break;
+		default:
+			break;
+		}
+
+		// Wait
+		ThisThread::sleep_for(100);
 	}
 }
