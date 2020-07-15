@@ -31,7 +31,7 @@ Axis::Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder,
 	strcat(taskName, " task");
 	/*Start the task-handling thread*/
 	task_thread = new Thread(osPriorityAboveNormal,
-	OS_STACK_SIZE, NULL, taskName);
+	2048, NULL, taskName);
 	task_thread->start(callback(this, &Axis::task));
 	tim.start();
 	// Register error callback

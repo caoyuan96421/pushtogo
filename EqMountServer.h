@@ -39,8 +39,10 @@ protected:
 	EquatorialMount *eq_mount; /// EqMount to be binded
 	FileHandle &stream; /// Input stream
 	Thread thread;
+	Thread evq_thd;
 	bool echo; /// Echo
 	Mutex stream_mutex;
+	EventQueue queue;
 
 	void task_thread(); /// Main task entrance
 	void command_execute(ServerCommand&, int argn, char *argv[], char *buffer); /// To execute a server command

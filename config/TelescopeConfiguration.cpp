@@ -251,8 +251,8 @@ void TelescopeConfiguration::setInt(ConfigItem *config, int value) {
 		return;
 	}
 	if (config->type != DATATYPE_DOUBLE && config->type != DATATYPE_INT) {
-		error("Data type mismatch %s: wanted %s, actual %s",
-				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		error("Data type mismatch %s: wanted %s, actual %s", config->config,
+				typeName(DATATYPE_INT), typeName(config->type));
 	}
 	if (config->type == DATATYPE_INT) {
 		if (value > config->max.idata)
@@ -275,8 +275,8 @@ void TelescopeConfiguration::setDouble(ConfigItem *config, double value) {
 		return;
 	}
 	if (config->type != DATATYPE_DOUBLE) {
-		error("Data type mismatch %s: wanted %s, actual %s",
-				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		error("Data type mismatch %s: wanted %s, actual %s", config->config,
+				typeName(DATATYPE_INT), typeName(config->type));
 		return;
 	}
 
@@ -293,8 +293,8 @@ void TelescopeConfiguration::setBool(ConfigItem *config, bool value) {
 		return;
 	}
 	if (config->type != DATATYPE_BOOL) {
-		error("Data type mismatch %s: wanted %s, actual %s",
-				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		error("Data type mismatch %s: wanted %s, actual %s", config->config,
+				typeName(DATATYPE_INT), typeName(config->type));
 		return;
 	}
 	config->value.bdata = value;
@@ -306,8 +306,8 @@ void TelescopeConfiguration::setString(ConfigItem *config, const char *value) {
 		return;
 	}
 	if (config->type != DATATYPE_STRING) {
-		error("Data type mismatch %s: wanted %s, actual %s",
-				config->config, typeName(DATATYPE_INT), typeName(config->type));
+		error("Data type mismatch %s: wanted %s, actual %s", config->config,
+				typeName(DATATYPE_INT), typeName(config->type));
 		return;
 	}
 	strncpy(config->value.strdata, value, sizeof(config->value.strdata));
@@ -346,7 +346,8 @@ ConfigItem* TelescopeConfiguration::addConfigItem(const char *name,
 ConfigItem* TelescopeConfiguration::getConfigItem(const char *name,
 		bool check) {
 	ConfigNode *p;
-	for (p = getHead(); p && (strcmp(p->config->config, name) != 0); p = p->next)
+	for (p = getHead(); p && (strcmp(p->config->config, name) != 0); p =
+			p->next)
 		;
 	if (!p) {
 		if (check)
@@ -356,10 +357,39 @@ ConfigItem* TelescopeConfiguration::getConfigItem(const char *name,
 		return p->config;
 }
 
+void TelescopeConfiguration::deleteConfigItem(const char *name) {
+	ConfigNode *p;
+	for (p = getHead(); p && (strcmp(p->config->config, name) != 0); p =
+			p->next)
+		;
+	if (p && p->default_config == NULL) { // Default configs cannot be deleted
+		if (p == getHead()) {
+			// Remove head, just point to the second element
+			getHead() = p->next;
+		} else {
+			// Find previous node
+			ConfigNode *q;
+			for (q = getHead(); q && q->next != p; q = q->next)
+				;
+			// Point to next element
+			q->next = p->next;
+		}
+		// Delete p properly
+		if (p->config->config) // non-default ones have deletable q->config->config string
+			delete p->config->config;
+		if (p->config)
+			delete p->config;
+		delete p;
+	}
+}
+
 TelescopeConfiguration::~TelescopeConfiguration() {
 	for (ConfigNode *q = getHead(); q;) {
 		ConfigNode *p = q->next;
-		delete q->config;
+		if (q->config->config && q->default_config) // Only non-default ones have deletable q->config->config string
+			delete q->config->config;
+		if (q->config)
+			delete q->config;
 		delete q;
 		q = p;
 	}
@@ -563,7 +593,8 @@ void TelescopeConfiguration::setConfigAutoType(const char *name,
 	setConfigAutoType(config, value);
 }
 
-void TelescopeConfiguration::setConfigAutoType(ConfigItem *config, const char *value) {
+void TelescopeConfiguration::setConfigAutoType(ConfigItem *config,
+		const char *value) {
 	switch (config->type) {
 	case DATATYPE_INT:
 		setInt(config, strtol(value, NULL, 10));
@@ -621,3 +652,8 @@ bool TelescopeConfiguration::setDoubleLimit(const char *name, double min,
 	config->max.ddata = max;
 	return true;
 }
+
+void TelescopeConfiguration::removeConfig(const char *name) {
+	deleteConfigItem(name);
+}
+

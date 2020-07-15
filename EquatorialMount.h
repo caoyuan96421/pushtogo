@@ -4,6 +4,7 @@
 #include "mbed.h"
 #include "Mount.h"
 #include "pushtogo.h"
+#include "printf.h"
 
 
 #define MAX_AS_N 10 // Max number of alignment stars
@@ -112,6 +113,7 @@ public:
 		num_alignment_stars = 0;
 		calibration = EqCalibration();
 		calibration.pa.alt = loc.getLatitude();
+		saveCalibration();
 	}
 
 	/** 
@@ -122,6 +124,7 @@ public:
 		calibration.cone = 0;
 		calibration.pa.alt = loc.getLatitude();
 		calibration.pa.azi = 0;
+		saveCalibration();
 	}
 
 	/**
@@ -133,11 +136,13 @@ public:
 	}
 
 	/**
-	 * Set calibration
+	 * Set calibration. This will force align all alignment stars for consistency and save.
 	 * @param calib New Calibration
 	 */
 	void setCalibration(const EqCalibration &calib) {
 		calibration = calib;
+		forceAlignment();
+		saveCalibration();
 	}
 
 	/** @return number of alignment stars
@@ -380,6 +385,8 @@ public:
 private:
 
 	void task_monitor();
+
+	void saveCalibration();
 };
 
 #endif /*_EQUATORIALMOUNT_H_*/

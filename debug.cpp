@@ -10,7 +10,7 @@
 #include "printf.h"
 
 void debug_ptg(ptgDbg dbg, const char *fmt, ...) {
-	char buf[512];
+	char buf[256];
 	int len = 0;
 	switch (dbg) {
 	case AXIS_DEBUG:
@@ -42,7 +42,7 @@ void debug_ptg(ptgDbg dbg, const char *fmt, ...) {
 }
 
 void debug_ptg(const char *fmt, ...) {
-	char buf[512];
+	char buf[256];
 	int len = 0;
 	va_list args;
 	va_start(args, fmt);

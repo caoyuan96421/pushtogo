@@ -30,7 +30,10 @@ void EqMountServer::vfprint(const char *fmt, va_list arg) {
 
 EqMountServer::EqMountServer(FileHandle &stream, bool echo) :
 		eq_mount(NULL), stream(stream), thread(osPriorityBelowNormal,
-		2*OS_STACK_SIZE, NULL, "EqMountServer"), echo(echo) {
+				OS_STACK_SIZE, NULL, "EqMountServer"), evq_thd(
+				osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE,
+				NULL, "EqMountServer dispatcher"), echo(echo), queue(
+				16 * EVENTS_EVENT_SIZE) {
 	thread.start(callback(this, &EqMountServer::task_thread));
 }
 
@@ -39,9 +42,6 @@ EqMountServer::~EqMountServer() {
 }
 
 void EqMountServer::task_thread() {
-	EventQueue queue(16 * EVENTS_EVENT_SIZE);
-	Thread evq_thd(osThreadGetPriority(ThisThread::get_id()), 2*OS_STACK_SIZE,
-			NULL, "EqMountServer dispatcher");
 	evq_thd.start(callback(&queue, &EventQueue::dispatch_forever));
 
 	while (true) {
@@ -440,7 +440,7 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 				svprintf(server, "%s %.8f %.8f %.8f %.8f %lld\r\n", cmd,
 						as->star_ref.ra, as->star_ref.dec,
 						as->star_meas.ra_delta, as->star_meas.dec_delta,
-						(uint64_t)as->timestamp);
+						(uint64_t) as->timestamp);
 			}
 		} else {
 			return ERR_WRONG_NUM_PARAM;
@@ -522,13 +522,17 @@ static int eqmount_align(EqMountServer *server, const char *cmd, int argn,
 	} else if (strcmp(argv[0], "debug") == 0) {
 		int n = server->getEqMount()->getNumAlignmentStar();
 		svprintf(server, "Number star: %d\r\n", n);
-		for (int i=0;i<n;i++){
+		for (int i = 0; i < n; i++) {
 			AlignmentStar *as = server->getEqMount()->getAlignmentStar(i);
 			MountCoordinates mc = as->star_meas;
 			EquatorialCoordinates eq = as->star_ref;
-			MountCoordinates mc2 = server->getEqMount()->convertToMountCoordinates(as->star_ref, as->timestamp);
-			svprintf(server, "Star %d\t(%6f,%6f)\tMeas: (%6f,%6f), Exp: (%6f,%6f)\r\n", i,
-					eq.ra, eq.dec, mc.ra_delta, mc.dec_delta, mc2.ra_delta, mc2.dec_delta);
+			MountCoordinates mc2 =
+					server->getEqMount()->convertToMountCoordinates(
+							as->star_ref, as->timestamp);
+			svprintf(server,
+					"Star %d\t(%6f,%6f)\tMeas: (%6f,%6f), Exp: (%6f,%6f)\r\n",
+					i, eq.ra, eq.dec, mc.ra_delta, mc.dec_delta, mc2.ra_delta,
+					mc2.dec_delta);
 		}
 	} else {
 		return ERR_PARAM_OUT_OF_RANGE;

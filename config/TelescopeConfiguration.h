@@ -90,8 +90,9 @@ public:
 
 	static bool isConfigExist(const char *name);
 //		return getInstance().getConfigItem(name) == NULL;
+	static void removeConfig(const char *name);
 
-	static ConfigNode *getHead() {
+	static ConfigNode *&getHead() {
 		static TelescopeConfiguration instance;
 		return instance.head;
 	}
@@ -104,6 +105,7 @@ private:
 
 	static ConfigItem* getConfigItem(const char *name, bool check = false);
 	static ConfigItem* addConfigItem(const char *name, DataType config_type);
+	static void deleteConfigItem(const char *name);
 
 	static int eqmount_config(EqMountServer *server, const char *cmd, int argn,
 			char *argv[]);

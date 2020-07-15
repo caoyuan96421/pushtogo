@@ -13,7 +13,7 @@
 PEC::PEC(Axis &a) :
 		axis(a), enabled(false), indexOffset(0) {
 	thread = new Thread(osPriorityAboveNormal,
-	OS_STACK_SIZE, NULL, "PEC Thread");
+	OS_STACK_SIZE / 4, NULL, "PEC Thread");
 	thread->start(callback(this, &PEC::task));
 
 	granularity = TelescopeConfiguration::getInt("pec_granularity");
