@@ -359,11 +359,13 @@ void EquatorialMount::stopSync() {
 osStatus EquatorialMount::recalibrate() {
 
 	if (num_alignment_stars == 0) {
+		calibration.error = 0;
 		return osOK;
 	}
 	EqCalibration newcalib = alignAuto(num_alignment_stars, alignment_stars,
 			loc.getLocation());
 	if (newcalib.error > 100.0) {
+		calibration.error = INFINITY;
 		return osErrorParameter;
 	}
 
@@ -541,4 +543,22 @@ void EquatorialMount::task_monitor() {
 		// Wait
 		ThisThread::sleep_for(100);
 	}
+}
+
+void EquatorialMount::linkEncoderOffset() {
+	double ra_off = calibration.offset.ra_off + ra.getEncoderOffset();
+	double dec_off = calibration.offset.dec_off + dec.getEncoderOffset();
+	// Set encoder offset to cancel calibration offset
+	ra.setEncoderOffset(ra_off);
+	dec.setEncoderOffset(dec_off);
+
+	TelescopeConfiguration::setDouble("ra_encoder_offset", ra_off);
+	TelescopeConfiguration::setDouble("dec_encoder_offset", dec_off);
+#ifdef NVSTORE_ENABLED
+	TelescopeConfiguration::saveConfig_NV();
+#endif
+
+	calibration.offset = IndexOffset(0,0);
+	forceAlignment();
+	recalibrate();
 }

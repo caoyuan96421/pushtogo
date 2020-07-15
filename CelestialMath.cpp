@@ -22,10 +22,11 @@ static inline double clamp(double x) {
 
 #define MAX_ITERATION 30
 #define MAX_ITERATION_OPTIMIZATION 10
+#define MIN_SCALE_FAC 1e-7
 
 #define MAXN	20
 
-static const double tol = 1e-10;
+static const double tol = 1e-6;
 static const double eps = 1e-13;
 static const double delta = 1e-7;
 
@@ -72,17 +73,17 @@ MountCoordinates::MountCoordinates(double dec, double ra, pierside_t s) :
 		dec_delta(dec), ra_delta(ra), side(s) {
 }
 
-MountCoordinates MountCoordinates::operator+(const IndexOffset& offset) const {
+MountCoordinates MountCoordinates::operator+(const IndexOffset &offset) const {
 	return MountCoordinates(remainder(dec_delta + offset.dec_off, 360),
 			remainder(ra_delta + offset.ra_off, 360), side);
 }
 
-MountCoordinates MountCoordinates::operator-(const IndexOffset& offset) const {
+MountCoordinates MountCoordinates::operator-(const IndexOffset &offset) const {
 	return MountCoordinates(remainder(dec_delta - offset.dec_off, 360),
 			remainder(ra_delta - offset.ra_off, 360), side);
 }
 
-AlignmentStar::AlignmentStar(const EquatorialCoordinates& ref,
+AlignmentStar::AlignmentStar(const EquatorialCoordinates &ref,
 		MountCoordinates meas, double t) :
 		star_ref(ref), star_meas(meas), timestamp(t) {
 }
@@ -91,7 +92,7 @@ EqCalibration::EqCalibration() :
 		cone(0), error(0) {
 }
 
-EqCalibration::EqCalibration(const IndexOffset& off,
+EqCalibration::EqCalibration(const IndexOffset &off,
 		const AzimuthalCoordinates p, double c, double e) :
 		offset(off), pa(p), cone(c), error(e) {
 }
@@ -173,7 +174,7 @@ EquatorialCoordinates LocalEquatorialCoordinates::toEquatorial(double timestamp,
 			remainder(getLocalSiderealTime(timestamp, loc) - ha, 360.0));
 }
 
-Transformation &Transformation::getMisalignedPolarAxisTransformation(
+Transformation& Transformation::getMisalignedPolarAxisTransformation(
 		const AzimuthalCoordinates &p, const LocationCoordinates &loc) {
 	double c1 = cos(p.azi * DEGREE), c2 = cos(p.alt * DEGREE), c3 = cos(
 			loc.lat * DEGREE);
@@ -193,7 +194,7 @@ Transformation &Transformation::getMisalignedPolarAxisTransformation(
 }
 
 LocalEquatorialCoordinates LocalEquatorialCoordinates::applyPolarMisalignment(
-		const Transformation& t) const {
+		const Transformation &t) const {
 	double c1 = cos(dec * DEGREE), c2 = cos(ha * DEGREE);
 	double s1 = sin(dec * DEGREE), s2 = sin(ha * DEGREE);
 	CartesianVector X = CartesianVector(c1 * c2, -c1 * s2, s1) * t;
@@ -203,7 +204,7 @@ LocalEquatorialCoordinates LocalEquatorialCoordinates::applyPolarMisalignment(
 }
 
 LocalEquatorialCoordinates LocalEquatorialCoordinates::deapplyPolarMisalignment(
-		const Transformation& t) const {
+		const Transformation &t) const {
 // the Transformation is ORTHOGONAL, T^-1 = T'
 	double c1 = cos(dec * DEGREE), c2 = cos(ha * DEGREE);
 	double s1 = sin(dec * DEGREE), s2 = sin(ha * DEGREE);
@@ -216,14 +217,14 @@ LocalEquatorialCoordinates LocalEquatorialCoordinates::deapplyPolarMisalignment(
 }
 
 LocalEquatorialCoordinates LocalEquatorialCoordinates::applyPolarMisalignment(
-		const AzimuthalCoordinates& mpa, const LocationCoordinates& loc) const {
+		const AzimuthalCoordinates &mpa, const LocationCoordinates &loc) const {
 	Transformation tr;
 	tr.getMisalignedPolarAxisTransformation(mpa, loc);
 	return applyPolarMisalignment(tr);
 }
 
 LocalEquatorialCoordinates LocalEquatorialCoordinates::deapplyPolarMisalignment(
-		const AzimuthalCoordinates& mpa, const LocationCoordinates& loc) const {
+		const AzimuthalCoordinates &mpa, const LocationCoordinates &loc) const {
 	Transformation tr;
 	tr.getMisalignedPolarAxisTransformation(mpa, loc);
 	return deapplyPolarMisalignment(tr);
@@ -284,8 +285,8 @@ IndexOffset alignOneStarForOffset(const AlignmentStar &star,
 }
 
 double alignTwoStars(const AlignmentStar stars[],
-		const LocationCoordinates& loc, AzimuthalCoordinates& pa,
-		IndexOffset& offset) {
+		const LocationCoordinates &loc, AzimuthalCoordinates &pa,
+		IndexOffset &offset) {
 	// Initialize the PA and offset
 	pa.alt = loc.lat;
 	pa.azi = 0;
@@ -371,16 +372,16 @@ double alignTwoStars(const AlignmentStar stars[],
 		offset.ra_off += -dp4;
 
 		residue = sqrt(f1 * f1 + f2 * f2 + f3 * f3 + f4 * f4); // calculate the difference
-		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\tdiff=%f\t %e %e\n", i,
-				pa.alt, pa.azi, offset.dec_off, offset.ra_off, residue, det,
+		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\tdiff=%f\t %e %e\r\n",
+				i, pa.alt, pa.azi, offset.dec_off, offset.ra_off, residue, det,
 				det * (i11 * i22 - i12 * i21));
 	}
 	if (diverge) {
 		/// Do something
-		debug_ptg(CM_DEBUG, "Diverge\n");
+		debug_ptg(CM_DEBUG, "Diverge\r\n");
 		return INFINITY;
 	}
-	debug_ptg(CM_DEBUG, "Final delta: %.2e\n", residue);
+	debug_ptg(CM_DEBUG, "Final delta: %.2e\r\n", residue);
 	return residue;
 }
 
@@ -454,8 +455,8 @@ static inline double sqr(double x) {
 
 static void get_corrected_coords(const int N, MountCoordinates mcs[],
 		const LocalEquatorialCoordinates star_ref_local[],
-		const MountCoordinates star_meas[], const LocationCoordinates& loc,
-		const AzimuthalCoordinates& pa, const IndexOffset& offset,
+		const MountCoordinates star_meas[], const LocationCoordinates &loc,
+		const AzimuthalCoordinates &pa, const IndexOffset &offset,
 		double cone) {
 	static Transformation t;
 	t.getMisalignedPolarAxisTransformation(pa, loc);
@@ -474,22 +475,20 @@ static void fill_jacobian(const int N, const int j, MountCoordinates stars0[],
 }
 
 double alignNStars(const int N, const AlignmentStar stars[],
-		const LocationCoordinates& loc, AzimuthalCoordinates& pa,
-		IndexOffset& offset, double& cone) {
+		const LocationCoordinates &loc, AzimuthalCoordinates &pa,
+		IndexOffset &offset, double &cone) {
+	int dof = 5;
 	if (N == 2) {
 		cone = 0;
-		return alignTwoStars(stars, loc, pa, offset);
-	}
-	if (N <= 1) {
-		return INFINITY;
+//		return alignTwoStars(stars, loc, pa, offset);
+		dof = 4;
 	}
 
 	// Assuming the cone error is not huge, we should be fairly close to the local minimum
 	int i = 0;
-	double residue = 1e10;
 	LocalEquatorialCoordinates star_ref_local[MAXN];
 	MountCoordinates star_meas[MAXN];
-	MountCoordinates stars0[MAXN], stars1[MAXN];
+	MountCoordinates stars0[MAXN], stars1[MAXN]; // stars0 stores the calculated star position using current best value of calibration
 	double dp[5];
 	double f[20];
 
@@ -498,12 +497,24 @@ double alignNStars(const int N, const AlignmentStar stars[],
 		star_meas[i] = stars[i].star_meas;
 	}
 
-	bool diverge = true;
+	// Calculate original residue
+	double residue = 0;
+	get_corrected_coords(N, stars0, star_ref_local, star_meas, loc, pa, offset,
+			cone); // Calculate initial star position
+	for (int p = 0; p < N; p++) {
+		f[2 * p] = stars0[p].dec_delta - star_meas[p].dec_delta;
+		f[2 * p + 1] = stars0[p].ra_delta - star_meas[p].ra_delta;
+		residue += sqr(f[2 * p]) + sqr(f[2 * p + 1]);
+	}
+	residue = sqrt(residue);
 
-	while (i++ < MAX_ITERATION_OPTIMIZATION && residue > tol) {
-		// Calulate Jacobian
-		get_corrected_coords(N, stars0, star_ref_local, star_meas, loc, pa,
-				offset, cone);
+	debug_ptg(CM_DEBUG, "Iteration 0, %f\t%f\t%f\t%f\t%f\tr=%f\r\n", pa.alt,
+			pa.azi, offset.dec_off, offset.ra_off, cone, residue);
+
+	while (i++ < MAX_ITERATION && residue > tol) {
+		memset(jac, 0, sizeof(jac));
+		memset(jacjac, 0, sizeof(jacjac));
+		memset(invj, 0, sizeof(invj));
 		/*Vary pa.alt*/
 		get_corrected_coords(N, stars1, star_ref_local, star_meas, loc,
 				AzimuthalCoordinates(pa.alt + delta, pa.azi), offset, cone);
@@ -521,69 +532,90 @@ double alignNStars(const int N, const AlignmentStar stars[],
 				IndexOffset(offset.dec_off, offset.ra_off + delta), cone);
 		fill_jacobian(N, 3, stars0, stars1, delta);
 		/*Vary cone*/
-		get_corrected_coords(N, stars1, star_ref_local, star_meas, loc, pa,
-				offset, cone + delta);
-		fill_jacobian(N, 4, stars0, stars1, delta);
+		if (N != 2) {
+			get_corrected_coords(N, stars1, star_ref_local, star_meas, loc, pa,
+					offset, cone + delta);
+			fill_jacobian(N, 4, stars0, stars1, delta);
+		}
 
 		// The Jacobian is now filled. It is 2*N rows and 5 columns
 		// Gauss-Newton method: x_n - x_(n-1) = - (J'J)^-1J' * f_(n-1)
 		// 1. Matrix multiplication
 		int p, q, r;
 
-		for (p = 0; p < 5; p++) {
-			for (q = 0; q < 5; q++) {
+		for (p = 0; p < dof; p++) {
+			for (q = 0; q < dof; q++) {
 				double s = 0;
 				for (r = 0; r < 2 * N; r++)
 					s += jac[r][p] * jac[r][q];
 				jacjac[p][q] = s;
 			}
 		}
+		if (N == 2) {
+			jacjac[4][4] = 1; // For inverting matrix
+		}
 
 		// 2. Matrix inversion
 		invert();
 
-		// 3. Calculate f_(n-1)
-		double newresidue = 0;
-		for (p = 0; p < N; p++) {
-			f[2 * p] = stars0[p].dec_delta - star_meas[i].dec_delta;
-			f[2 * p + 1] = stars0[p].ra_delta - star_meas[i].ra_delta;
-			newresidue += sqr(f[2 * p]) + sqr(f[2 * p + 1]);
-		}
-		newresidue = sqrt(newresidue);
-		// 4. Matrix multiplication
-		for (p = 0; p < 5; p++) {
+		// 3. Matrix multiplication
+		for (p = 0; p < dof; p++) {
 			double s = 0;
-			for (q = 0; q < 5; q++) {
+			for (q = 0; q < dof; q++) {
 				for (r = 0; r < 2 * N; r++) {
-					s += invj[p][q] * jac[r][q] * f[r];
+					s += invj[p][q] * jac[r][q] * f[r]; // f is the difference vector
 				}
 			}
 			dp[p] = -s;
 		}
-		// 5. Apply the correction
-		pa.alt += dp[0];
-		pa.azi += dp[1];
-		offset.dec_off += dp[2];
-		offset.ra_off += dp[3];
-		cone += dp[4];
+
+		// 4. Scaling
+		double scale_fac = 2;
+		double newresidue;
+		do {
+			scale_fac /= 2; // Initial factor is 1
+			// Calulate new star position
+			get_corrected_coords(N, stars0, star_ref_local, star_meas, loc,
+					AzimuthalCoordinates(pa.alt + dp[0] * scale_fac,
+							pa.azi + dp[1] * scale_fac),
+					IndexOffset(offset.dec_off + dp[2] * scale_fac,
+							offset.ra_off + dp[3] * scale_fac),
+					(N == 2) ? 0 : cone + dp[4] * scale_fac);
+
+			newresidue = 0;
+			for (p = 0; p < N; p++) {
+				f[2 * p] = stars0[p].dec_delta - star_meas[p].dec_delta;
+				f[2 * p + 1] = stars0[p].ra_delta - star_meas[p].ra_delta;
+				newresidue += sqr(f[2 * p]) + sqr(f[2 * p + 1]);
+			}
+			newresidue = sqrt(newresidue);
+			debug_ptg(CM_DEBUG, "\t- scale=%f\tresidue=%f\r\n", scale_fac,
+					newresidue);
+		} while (scale_fac > MIN_SCALE_FAC && newresidue > residue);
+
+		if (newresidue < residue) {
+			// 5. Apply the best correction
+			pa.alt += dp[0] * scale_fac;
+			pa.azi += dp[1] * scale_fac;
+			offset.dec_off += dp[2] * scale_fac;
+			offset.ra_off += dp[3] * scale_fac;
+			if (N != 2)
+				cone += dp[4] * scale_fac;
+		}
+
+		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\t%f\tr=%f\r\n", i,
+				pa.alt, pa.azi, offset.dec_off, offset.ra_off, cone,
+				newresidue);
 
 		if (newresidue >= residue - tol) {
-			debug_ptg(CM_DEBUG, "Converged.\n");
-			diverge = false;
+			debug_ptg(CM_DEBUG, "Converged.\r\n");
 			break;
 		} else {
 			residue = newresidue;
 		}
-		debug_ptg(CM_DEBUG, "Iteration %i, %f\t%f\t%f\t%f\t%f\tr=%f\n", i,
-				pa.alt, pa.azi, offset.dec_off, offset.ra_off, cone, residue);
 	}
 
-	if (diverge) {
-		debug_ptg(CM_DEBUG, "Diverged.\n");
-		return INFINITY;
-	}
-
-	debug_ptg(CM_DEBUG, "Final result: %f\t%f\t%f\t%f\t%f\tr=%f\n", pa.alt,
+	debug_ptg(CM_DEBUG, "Final result: %f\t%f\t%f\t%f\t%f\tr=%f\r\n", pa.alt,
 			pa.azi, offset.dec_off, offset.ra_off, cone, residue);
 	return residue;
 
@@ -597,12 +629,11 @@ EqCalibration alignAuto(const int N, const AlignmentStar stars[],
 		calib.offset = alignOneStarForOffset(stars[0], loc);
 		return calib; // Always success
 	} else {
-		if (N == 2) {
+		/*if (N == 2) {
 			alignTwoStars(stars, loc, calib.pa, calib.offset);
-		} else if (N <= MAXN) {
+		} else */if (N <= MAXN) {
 			alignNStars(N, stars, loc, calib.pa, calib.offset, calib.cone);
-		}
-		else{
+		} else {
 			// Only use the first MAXN stars
 			alignNStars(MAXN, stars, loc, calib.pa, calib.offset, calib.cone);
 		}
@@ -625,7 +656,7 @@ EqCalibration alignAuto(const int N, const AlignmentStar stars[],
 	return calib;
 }
 
-double parseHMSAngle(char* hms) {
+double parseHMSAngle(char *hms) {
 	char *h = strchr(hms, 'h');
 	char *m = strchr(hms, 'm');
 	char *s = strchr(hms, 's');
@@ -659,7 +690,7 @@ double parseHMSAngle(char* hms) {
 	return remainder((hour + minute / 60.0 + second / 3600.0) * 15, 360);
 }
 
-double parseDMSAngle(char* dms) {
+double parseDMSAngle(char *dms) {
 	char *d = strchr(dms, 'd');
 	char *m = strchr(dms, 'm');
 	char *s = strchr(dms, 's');

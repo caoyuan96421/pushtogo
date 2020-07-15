@@ -207,13 +207,16 @@ public:
 	 * @param eq EQ coordinate to convert
 	 * @return mount coordinates
 	 */
-	MountCoordinates convertToMountCoordinates(
-			const EquatorialCoordinates &eq) {
+
+	MountCoordinates convertToMountCoordinates(const EquatorialCoordinates &eq, double timestamp){
 		LocationCoordinates l = loc.getLocation();
-		double timestamp = clock.getTimeHighResolution();
 		return eq.toLocalEquatorialCoordinates(timestamp, l).applyPolarMisalignment(
 				calibration.pa, l).applyConeError(calibration.cone).toMountCoordinates(
 				PIER_SIDE_AUTO) + calibration.offset;
+	}
+	MountCoordinates convertToMountCoordinates(
+			const EquatorialCoordinates &eq) {
+		return convertToMountCoordinates(eq, clock.getTimeHighResolution());
 	}
 
 	/**
@@ -327,6 +330,11 @@ public:
 	 * Has effect only if both RA and DEC encoders are enabled
 	 */
 	void setEncoderIndex();
+
+	/**
+	 * Set encoder offset such that the calibration offset is absorbed, and then set calibration offset to zero, and force calibration
+	 */
+	void linkEncoderOffset();
 
 	/**
 	 * Print current position to stream. 
