@@ -30,7 +30,7 @@ void EqMountServer::vfprint(const char *fmt, va_list arg) {
 
 EqMountServer::EqMountServer(FileHandle &stream, bool echo) :
 		eq_mount(NULL), stream(stream), thread(osPriorityBelowNormal,
-				OS_STACK_SIZE, NULL, "EqMountServer"), evq_thd(
+		OS_STACK_SIZE, NULL, "EqMountServer"), evq_thd(
 				osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE,
 				NULL, "EqMountServer dispatcher"), echo(echo), queue(
 				16 * EVENTS_EVENT_SIZE) {
@@ -143,7 +143,7 @@ void EqMountServer::task_thread() {
 		}
 
 		// Commands that can return immediately, directly run them
-		if (cind < 8 || strcmp(command, "config") == 0) {
+		if (cind < 10 || strcmp(command, "config") == 0) {
 			int ret = commandlist[cind].fptr(this, command, argn, args);
 			// Send the return status back
 			svprintf(this, "%d %s\r\n", ret, command);
@@ -804,6 +804,22 @@ static int eqmount_settime(EqMountServer *server, const char *cmd, int argn,
 	return 0;
 }
 
+static int eqmount_save(EqMountServer *server, const char *cmd, int argn,
+		char *argv[]) {
+	if (argn != 0) {
+		svprintf(server, "Usage: save\r\n");
+		return -1;
+	}
+	TelescopeConfiguration::saveConfig_NV();
+	return 0;
+}
+
+static int eqmount_reboot(EqMountServer *server, const char *cmd, int argn,
+		char *argv[]) {
+	NVIC_SystemReset();
+	return 0;
+}
+
 void EqMountServer::addCommand(const ServerCommand &cmd) {
 	int i = 0;
 	while (i < MAX_COMMAND && commandlist[i].fptr != NULL)
@@ -817,6 +833,87 @@ void EqMountServer::addCommand(const ServerCommand &cmd) {
 	commandlist[++i] = ServerCommand("", "", NULL);
 }
 
+#include "rtx_lib.h"
+
+static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
+		char *argv[]) {
+	const int THD_MAX = 32;
+	osThreadId_t thdlist[THD_MAX];
+	int nt = osThreadEnumerate(thdlist, THD_MAX);
+	mbed_stats_stack_t *stats = (mbed_stats_stack_t*) malloc(
+			nt * sizeof(mbed_stats_stack_t));
+	nt = mbed_stats_stack_get_each(stats, nt);
+
+	svprintf(server, "Thread list: \r\n");
+	for (int i = 0; i < nt; i++) {
+		osThreadState_t state = osThreadGetState(thdlist[i]);
+		const char *s = "";
+		const char *n;
+		osPriority_t prio = osThreadGetPriority(thdlist[i]);
+
+		n = osThreadGetName(thdlist[i]);
+		if (n == NULL)
+			n = "System thread";
+
+		switch (state) {
+		case osThreadInactive:
+			s = "Inactive";
+			break;
+		case osThreadReady:
+			s = "Ready";
+			break;
+		case osThreadRunning:
+			s = "Running";
+			break;
+		case osThreadBlocked:
+			s = "Blocked";
+			break;
+		case osThreadTerminated:
+			s = "Terminated";
+			break;
+		case osThreadError:
+			s = "Error";
+			break;
+		default:
+			s = "Unknown";
+			break;
+		}
+		uint32_t pc;
+
+		if (thdlist[i] == ThisThread::get_id()) {
+			uint32_t _pc;
+			__asm__ __volatile__ ("mov %0, pc" : "=r" (_pc));
+			pc = _pc;
+		} else {
+			osRtxThread_t *thd = osRtxThreadId(thdlist[i]);
+			uint32_t sp = thd->sp;
+			pc = *((uint32_t*) (sp
+					+ (((thd->stack_frame & 0x10) == 0) ? 0x78 : 0x38))); // Get PC from the stack frame
+		}
+
+		int j = 0;
+		for (j = 0; j < nt; j++)
+			if (stats[j].thread_id == (uint32_t) thdlist[i])
+				break;
+
+		svprintf(server, " - %10s 0x%08x %3d %6lu/%6lu bytes\t%s \r\n", s, pc,
+				(int) prio, stats[j].max_size, stats[j].reserved_size, n);
+	}
+
+	free(stats);
+
+	// Grab the heap statistics
+	mbed_stats_heap_t heap_stats;
+	mbed_stats_heap_get(&heap_stats);
+	svprintf(server, "Heap size: %lu / %lu bytes\r\n", heap_stats.current_size,
+			heap_stats.reserved_size);
+
+//	stprintf(server->getStream(), "\r\nRecent CPU usage: %.1f%%\r\n",
+//			MCULoadMeasurement::getInstance().getCPUUsage() * 100);
+	return 0;
+}
+
+// @formatter:off
 ServerCommand commandlist[MAX_COMMAND] = { /// List of all commands
 		ServerCommand("stop", "Stop mount motion", eqmount_stop), 	/// Stop
 		ServerCommand("estop", "Emergency stop", eqmount_estop), /// Emergency Stop
@@ -826,17 +923,20 @@ ServerCommand commandlist[MAX_COMMAND] = { /// List of all commands
 		ServerCommand("help", "Print this help menu", eqmount_help), /// Help menu
 		ServerCommand("speed", "Set slew and tracking speed", eqmount_speed), /// Set speed
 		ServerCommand("align", "Star alignment", eqmount_align), /// Alignment
+		ServerCommand("sys", "Print thread and memory info", eqmount_sys), /// System threads and memory
+		ServerCommand("save", "Save configuration file into ROM", eqmount_save), /// System threads and memory
 		/// Above are allowed commands when another command is running
 
-				ServerCommand("goto",
-						"Perform go to operation to specified ra, dec coordinates",
-						eqmount_goto), 		/// Go to
-				ServerCommand("nudge", "Perform nudging on specified direction",
-						eqmount_nudge), 		/// Nudge
-				ServerCommand("track", "Start tracking in specified direction",
-						eqmount_track), 		/// Track
-				ServerCommand("guide", "Guide on specified direction",
-						eqmount_guide), /// Guide
-				ServerCommand("settime", "Set system time", eqmount_settime), /// System time
-				ServerCommand("", "", NULL) };
-
+		ServerCommand("goto",
+				"Perform go to operation to specified ra, dec coordinates",
+				eqmount_goto), 		/// Go to
+		ServerCommand("nudge", "Perform nudging on specified direction",
+				eqmount_nudge), 		/// Nudge
+		ServerCommand("track", "Start tracking in specified direction",
+				eqmount_track), 		/// Track
+		ServerCommand("guide", "Guide on specified direction",
+				eqmount_guide), /// Guide
+		ServerCommand("settime", "Set system time", eqmount_settime), /// System time
+		ServerCommand("reboot", "Restart system", eqmount_reboot), /// System threads and memory
+		ServerCommand("", "", NULL) };
+// @formatter:on
