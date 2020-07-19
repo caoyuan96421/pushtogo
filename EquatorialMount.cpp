@@ -229,7 +229,7 @@ osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 	} else { // newdir is not NUDGE_NONE
 		updatePosition(); // Update current position, because we need to know the current pier side
 		bool ra_changed = false, dec_changed = false;
-		axisrotdir_t ra_dir, dec_dir;
+		axisrotdir_t ra_dir=AXIS_ROTATE_STOP, dec_dir=AXIS_ROTATE_STOP;
 		if ((status & MOUNT_NUDGING) == 0) {
 			// Initial nudge
 			curr_nudge_dir = NUDGE_NONE; //Make sure the current nudging direction is cleared

@@ -210,7 +210,7 @@ LocalEquatorialCoordinates LocalEquatorialCoordinates::deapplyPolarMisalignment(
 	double s1 = sin(dec * DEGREE), s2 = sin(ha * DEGREE);
 	Transformation tp = t;
 	tp.transpose();
-	CartesianVector X = CartesianVector(c1 * c2, -c1 * s2, s1) * t;
+	CartesianVector X = CartesianVector(c1 * c2, -c1 * s2, s1) * tp;
 
 	return LocalEquatorialCoordinates(asin(clamp(X.z)) * RADIAN,
 			atan2(-X.y, X.x) * RADIAN);
