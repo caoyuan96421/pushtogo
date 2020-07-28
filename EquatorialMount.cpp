@@ -32,27 +32,10 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 				TelescopeConfiguration::getDouble("dec_encoder_offset"));
 	}
 
-	// Get initial calibration
-
-	if (TelescopeConfiguration::isConfigExist("calib_off_ra")
-			&& TelescopeConfiguration::isConfigExist("calib_off_dec")
-			&& TelescopeConfiguration::isConfigExist("calib_pa_alt")
-			&& TelescopeConfiguration::isConfigExist("calib_pa_azi")
-			&& TelescopeConfiguration::isConfigExist("calib_cone")) {
-		calibration.offset = IndexOffset(
-				TelescopeConfiguration::getDouble("calib_off_dec"),
-				TelescopeConfiguration::getDouble("calib_off_ra"));
-		calibration.pa = AzimuthalCoordinates(
-				TelescopeConfiguration::getDouble("calib_pa_alt"),
-				TelescopeConfiguration::getDouble("calib_pa_azi"));
-		calibration.cone = TelescopeConfiguration::getDouble("calib_cone");
-	} else {
-		calibration.pa = AzimuthalCoordinates(loc.getLatitude(), 0);
-	}
-
-	// Load all calibration stars as well
-	if (TelescopeConfiguration::isConfigExist("calib_num_stars")) {
-		num_alignment_stars = TelescopeConfiguration::getInt("calib_num_stars");
+	// Load calibration
+	if (TelescopeConfiguration::isConfigExist("calib_num_stars") // If has stars, load stars and calibrate from there
+			&& (num_alignment_stars = TelescopeConfiguration::getInt(
+					"calib_num_stars")) > 0) {
 		for (int i = 0; i < num_alignment_stars; i++) {
 			char buf[32];
 			sprintf(buf, "cs_%d_r_ra", i);
@@ -96,6 +79,22 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 				break;
 			}
 		}
+
+		recalibrate();
+	} else if (TelescopeConfiguration::isConfigExist("calib_off_ra")
+			&& TelescopeConfiguration::isConfigExist("calib_off_dec")
+			&& TelescopeConfiguration::isConfigExist("calib_pa_alt")
+			&& TelescopeConfiguration::isConfigExist("calib_pa_azi")
+			&& TelescopeConfiguration::isConfigExist("calib_cone")) { // Else try to directly load the calibration
+		calibration.offset = IndexOffset(
+				TelescopeConfiguration::getDouble("calib_off_dec"),
+				TelescopeConfiguration::getDouble("calib_off_ra"));
+		calibration.pa = AzimuthalCoordinates(
+				TelescopeConfiguration::getDouble("calib_pa_alt"),
+				TelescopeConfiguration::getDouble("calib_pa_azi"));
+		calibration.cone = TelescopeConfiguration::getDouble("calib_cone");
+	} else {																	// Else use initial calibration
+		calibration.pa = AzimuthalCoordinates(loc.getLatitude(), 0);
 	}
 
 	// Start in tracking mode
@@ -229,7 +228,7 @@ osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 	} else { // newdir is not NUDGE_NONE
 		updatePosition(); // Update current position, because we need to know the current pier side
 		bool ra_changed = false, dec_changed = false;
-		axisrotdir_t ra_dir=AXIS_ROTATE_STOP, dec_dir=AXIS_ROTATE_STOP;
+		axisrotdir_t ra_dir = AXIS_ROTATE_STOP, dec_dir = AXIS_ROTATE_STOP;
 		if ((status & MOUNT_NUDGING) == 0) {
 			// Initial nudge
 			curr_nudge_dir = NUDGE_NONE; //Make sure the current nudging direction is cleared
@@ -479,7 +478,12 @@ void EquatorialMount::saveCalibration() {
 		}
 	}
 	// Write number of stars and all star info
-	TelescopeConfiguration::setInt("calib_num_stars", num_alignment_stars);
+	if (num_alignment_stars > 0)
+		TelescopeConfiguration::setInt("calib_num_stars", num_alignment_stars);
+	else if (TelescopeConfiguration::isConfigExist("calib_num_stars")){
+		// Remove calib star config if there is no star, so next time it will not be loaded
+		TelescopeConfiguration::removeConfig("calib_num_stars");
+	}
 	for (int i = 0; i < num_alignment_stars; i++) {
 		char buf[32];
 		sprintf(buf, "cs_%d_r_ra", i);
@@ -487,17 +491,16 @@ void EquatorialMount::saveCalibration() {
 		sprintf(buf, "cs_%d_r_dec", i);
 		TelescopeConfiguration::setDouble(buf, alignment_stars[i].star_ref.dec);
 		sprintf(buf, "cs_%d_m_ra", i);
-		TelescopeConfiguration::setDouble(buf, alignment_stars[i].star_meas.ra_delta);
+		TelescopeConfiguration::setDouble(buf,
+				alignment_stars[i].star_meas.ra_delta);
 		sprintf(buf, "cs_%d_m_dec", i);
-		TelescopeConfiguration::setDouble(buf, alignment_stars[i].star_meas.dec_delta);
+		TelescopeConfiguration::setDouble(buf,
+				alignment_stars[i].star_meas.dec_delta);
 		sprintf(buf, "cs_%d_time", i);
 		TelescopeConfiguration::setDouble(buf, alignment_stars[i].timestamp);
 	}
 
-
-#ifdef NVSTORE_ENABLED
-	TelescopeConfiguration::saveConfig_NV();
-#endif
+	TelescopeConfiguration::saveConfig();
 }
 
 osStatus EquatorialMount::guide(guidedir_t dir, int ms) {
@@ -619,10 +622,8 @@ void EquatorialMount::setEncoderIndex() {
 
 	TelescopeConfiguration::setDouble("ra_encoder_offset", ra_off);
 	TelescopeConfiguration::setDouble("dec_encoder_offset", dec_off);
-#ifdef NVSTORE_ENABLED
-	TelescopeConfiguration::saveConfig_NV();
-#endif
 
+	TelescopeConfiguration::saveConfig();
 }
 
 double EquatorialMount::getTilt() {
@@ -680,9 +681,7 @@ void EquatorialMount::linkEncoderOffset() {
 
 	TelescopeConfiguration::setDouble("ra_encoder_offset", ra_off);
 	TelescopeConfiguration::setDouble("dec_encoder_offset", dec_off);
-#ifdef NVSTORE_ENABLED
-	TelescopeConfiguration::saveConfig_NV();
-#endif
+	TelescopeConfiguration::saveConfig();
 
 	calibration.offset = IndexOffset(0, 0);
 	forceAlignment();

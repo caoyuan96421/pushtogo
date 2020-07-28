@@ -652,7 +652,7 @@ EqCalibration alignAuto(const int N, const AlignmentStar stars[],
 		r += sqr(mc.ra_delta - stars[i].star_meas.ra_delta)
 				+ sqr(mc.dec_delta - stars[i].star_meas.dec_delta);
 	}
-	calib.error = sqrt(r);
+	calib.error = sqrt(r/N);
 	return calib;
 }
 

@@ -12,9 +12,11 @@
 #include <string.h>
 #include "pushtogo.h"
 
-#ifdef NVSTORE_ENABLED
-#include "nvstore.h"
-#endif
+//#ifdef NVSTORE_ENABLED
+//#include "nvstore.h"
+//#endif
+
+#include "kvstore.h"
 
 typedef enum {
 	DATATYPE_INT, DATATYPE_DOUBLE, DATATYPE_STRING, DATATYPE_BOOL
@@ -55,10 +57,8 @@ public:
 	static void readFromFile(FILE *fp);
 	static void writeToFile(FILE *fp);
 
-#ifdef NVSTORE_ENABLED
-	static int saveConfig_NV();
-	static int readConfig_NV();
-#endif
+	static int saveConfig(KVStore *kv=NULL);
+	static int readConfig(KVStore *kv=NULL);
 
 	static int getInt(const char *name);
 	static double getDouble(const char *name);

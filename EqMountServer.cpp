@@ -810,7 +810,7 @@ static int eqmount_save(EqMountServer *server, const char *cmd, int argn,
 		svprintf(server, "Usage: save\r\n");
 		return -1;
 	}
-	TelescopeConfiguration::saveConfig_NV();
+	TelescopeConfiguration::saveConfig();
 	return 0;
 }
 

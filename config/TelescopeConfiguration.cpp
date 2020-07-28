@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <float.h>
 #include "printf.h"
+#include "kv_config.h"
+#include "KVMap.h"
 
 ConfigNode *TelescopeConfiguration::head;
 
@@ -189,9 +191,9 @@ TelescopeConfiguration::TelescopeConfiguration() {
 		q = r;
 	}
 
-#ifdef NVSTORE_ENABLED
-	NVStore::get_instance().set_max_keys(128);
-#endif
+	if(kv_init_storage_config() != MBED_SUCCESS){
+		error("Error: KVStore init failed");
+	}
 
 	EqMountServer::addCommand(
 			ServerCommand("config", "Configuration subsystem",
@@ -458,48 +460,60 @@ void TelescopeConfiguration::writeToFile(FILE *fp) {
 	}
 }
 
-#ifdef NVSTORE_ENABLED
 
-int TelescopeConfiguration::saveConfig_NV() {
-	char buf[256];
+int TelescopeConfiguration::saveConfig(KVStore *kv) {
+	char key[32], value[256];
 	bool success = true;
-	NVStore &nv = NVStore::get_instance();
-
-	for (ConfigNode *p = getHead(); p; p = p->next) {
-		// Format of saving: [name] [value]
-		size_t len = snprintf(buf, sizeof(buf), "%s ", p->config->config);
-		getString(p->config, buf + len, sizeof(buf) - len);
-
-		if (nv.set(p->key, strlen(buf), buf) != NVSTORE_SUCCESS) {
-			success = false;
+	if (!kv){
+		KVMap &kv_map = KVMap::get_instance();
+		kv = kv_map.get_main_kv_instance("/kv/");
+		if (!kv) {
+			error("Error: cannot find /kv/");
 		}
+	}
+
+	if (kv->init() != MBED_SUCCESS)
+		return false;
+	for (ConfigNode *p = getHead(); p; p = p->next) {
+		strncpy(key, p->config->config, sizeof(key)); key[sizeof(key)-1] = 0;
+		getString(p->config, value, sizeof(value));
+
+//		if (nv.set(p->key, strlen(buf), buf) != NVSTORE_SUCCESS) {
+		if (!kv->is_valid_key(key) || kv->set(key, value, strlen(value)+1, 0) != MBED_SUCCESS)
+			success = false;
 	}
 
 	return success ? 0 : -1;
 }
 
-int TelescopeConfiguration::readConfig_NV() {
-	char buf[256];
-	NVStore &nv = NVStore::get_instance();
-	unsigned int key;
+int TelescopeConfiguration::readConfig(KVStore *kv) {
+	char key[32], value[256];
+	(void) getHead();
+	if (!kv){
+		KVMap &kv_map = KVMap::get_instance();
+		kv = kv_map.get_main_kv_instance("/kv/");
+		if (!kv) {
+			error("Error: cannot find /kv/");
+		}
+	}
+	if (kv->init() != MBED_SUCCESS)
+		return false;
+	KVStore::iterator_t it;
+	if (kv->iterator_open(&it, NULL) != MBED_SUCCESS)
+		return false;
 	// Iterate over all saved items
-	for (key = 0; key < nv.get_max_keys(); key++) {
-		unsigned short actual_size;
-		if (nv.get(key, sizeof(buf), buf, actual_size) != NVSTORE_SUCCESS) {
+	while(kv->iterator_next(it, key, sizeof(key)) == MBED_SUCCESS){
+		unsigned int actual_size;
+		if (kv->get(key, value, sizeof(value), &actual_size, 0) != MBED_SUCCESS) {
 			break;
 		}
-		char *sp = strchr(buf, ' ');
-		char *name = buf;
-		char *value = sp + 1;
-		*sp = '\0'; // Terminate name string
-		*(buf + actual_size) = '\0'; // Terminate value string
-		setConfigAutoType(name, value);
+		setConfigAutoType(key, value);
 	}
+	kv->iterator_close(it);
 
-	return key >= sizeof(default_config) / sizeof(ConfigItem); // Success if at least all default items are set
+	return true;
 }
 
-#endif
 
 int TelescopeConfiguration::getInt(const char *name) {
 	ConfigItem *config = getConfigItem(name, true);
