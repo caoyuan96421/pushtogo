@@ -43,7 +43,7 @@ Axis::~Axis() {
 	if (status != AXIS_STOPPED) {
 		stop();
 		while (status != AXIS_STOPPED) {
-			ThisThread::sleep_for(100);
+			ThisThread::sleep_for(100ms);
 		}
 	}
 
@@ -233,7 +233,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 
 	/*Slewing -> accel, wait, decel*/
 	if (!skip_slew) {
-		int wait_ms;
+		chrono::milliseconds wait_ms;
 		uint32_t flags;
 		/*Acceleration*/
 		slewState = AXIS_SLEW_ACCELERATING;
@@ -280,15 +280,15 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 		/*Keep slewing and wait*/
 		slewState = AXIS_SLEW_CONSTANT_SPEED;
 		debug_ptg(AXIS_DEBUG, "%s: wait for %f\r\n", axisName, waitTime); // TODO
-		wait_ms = (isinf(waitTime)) ? osWaitForever : (int) (waitTime * 1000);
+		wait_ms = chrono::milliseconds((isinf(waitTime)) ? osWaitForever : (int) (waitTime * 1000));
 
 		tim.reset();
 
-		while (isinf(waitTime) || wait_ms > 0) {
+		while (isinf(waitTime) || wait_ms.count() > 0) {
 			flags = osThreadFlagsWait(
 					AXIS_STOP_SIGNAL | AXIS_EMERGE_STOP_SIGNAL
 							| (indefinite ? AXIS_SPEEDCHANGE_SIGNAL : 0),
-					osFlagsWaitAny, wait_ms); /*Wait the remaining time*/
+					osFlagsWaitAny, wait_ms.count()); /*Wait the remaining time*/
 			if (flags != osFlagsErrorTimeout) {
 				if (flags & AXIS_EMERGE_STOP_SIGNAL) {
 					slew_finish_state = FINISH_EMERG_STOPPED;
@@ -345,7 +345,7 @@ void Axis::slew(axisrotdir_t dir, double dest, bool indefinite,
 				}
 			}
 			if (!indefinite) {
-				wait_ms -= tim.read_ms();
+				wait_ms -= chrono::duration_cast<chrono::milliseconds>(tim.elapsed_time());
 				tim.reset();
 			}
 		}

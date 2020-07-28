@@ -33,6 +33,11 @@ static const char* typeName(DataType type) {
 	}
 }
 
+// Prefix of keys stored in KVStore
+static const char * PTG_prefix = "p_";
+
+static const int PTG_prefix_len = strlen(PTG_prefix);
+
 // @formatter:off
 static const ConfigItem default_config[] =
 		{
@@ -475,7 +480,11 @@ int TelescopeConfiguration::saveConfig(KVStore *kv) {
 	if (kv->init() != MBED_SUCCESS)
 		return false;
 	for (ConfigNode *p = getHead(); p; p = p->next) {
-		strncpy(key, p->config->config, sizeof(key)); key[sizeof(key)-1] = 0;
+		// Add prefix to key
+		strcpy(key, PTG_prefix);
+		strncpy(key + PTG_prefix_len, p->config->config, sizeof(key)-PTG_prefix_len);
+		key[sizeof(key)-1] = 0;
+		// Get value
 		getString(p->config, value, sizeof(value));
 
 //		if (nv.set(p->key, strlen(buf), buf) != NVSTORE_SUCCESS) {
@@ -499,7 +508,7 @@ int TelescopeConfiguration::readConfig(KVStore *kv) {
 	if (kv->init() != MBED_SUCCESS)
 		return false;
 	KVStore::iterator_t it;
-	if (kv->iterator_open(&it, NULL) != MBED_SUCCESS)
+	if (kv->iterator_open(&it, PTG_prefix) != MBED_SUCCESS)
 		return false;
 	// Iterate over all saved items
 	while(kv->iterator_next(it, key, sizeof(key)) == MBED_SUCCESS){
@@ -507,7 +516,7 @@ int TelescopeConfiguration::readConfig(KVStore *kv) {
 		if (kv->get(key, value, sizeof(value), &actual_size, 0) != MBED_SUCCESS) {
 			break;
 		}
-		setConfigAutoType(key, value);
+		setConfigAutoType(key + PTG_prefix_len, value);
 	}
 	kv->iterator_close(it);
 
