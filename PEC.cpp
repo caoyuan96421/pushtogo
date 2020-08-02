@@ -65,10 +65,10 @@ void PEC::task() {
 				count++;
 				while ((t.read_high_resolution_us() - startTimeUs)
 						< intervalUs * count) {
-					ThisThread::sleep_for(1);
+					ThisThread::sleep_for(1ms);
 				}
 			}
 		}
-		ThisThread::sleep_for(10);
+		ThisThread::sleep_for(10ms);
 	}
 }

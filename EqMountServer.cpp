@@ -11,6 +11,8 @@
 #include <time.h>
 #include "printf.h"
 
+#define EQMOUNT_TERMINATE 1
+
 extern ServerCommand commandlist[MAX_COMMAND];
 
 void svprintf(EqMountServer *server, const char *fmt, ...) {
@@ -29,24 +31,39 @@ void EqMountServer::vfprint(const char *fmt, va_list arg) {
 }
 
 EqMountServer::EqMountServer(FileHandle &stream, bool echo) :
-		eq_mount(NULL), stream(stream), thread(osPriorityBelowNormal,
+		eq_mount(NULL), stream(stream), thread(osPriorityAboveNormal,
 		OS_STACK_SIZE, NULL, "EqMountServer"), evq_thd(
-				osThreadGetPriority(ThisThread::get_id()), OS_STACK_SIZE,
+				osPriorityNormal, OS_STACK_SIZE,
 				NULL, "EqMountServer dispatcher"), echo(echo), queue(
 				16 * EVENTS_EVENT_SIZE) {
 	thread.start(callback(this, &EqMountServer::task_thread));
 }
 
 EqMountServer::~EqMountServer() {
-	thread.terminate();
+	// Wait for unfinished commands to finish
+	thread.flags_set(EQMOUNT_TERMINATE);
+	thread.join();
 }
 
 void EqMountServer::task_thread() {
 	evq_thd.start(callback(&queue, &EventQueue::dispatch_forever));
 
 	while (true) {
+
+		// Check if terminate flag is set
+		if (ThisThread::flags_get() & EQMOUNT_TERMINATE) {
+			ThisThread::flags_clear(EQMOUNT_TERMINATE);
+			// Try to terminate the event queue
+			queue.break_dispatch();
+			// Wait for the remaining task to finish
+			evq_thd.join();
+			break;
+		}
+
+		// No memory has been allocated until thsi point
+
 		const int size = 256;
-		char *buffer = new char[size]; // text buffer
+		char *buffer = new char[size]; // text buffer. This must be properly
 		if (!buffer) {
 			error("EqMountServer: out of memory\r\n");
 			break;
@@ -56,7 +73,17 @@ void EqMountServer::task_thread() {
 		while (i < size - 2) {
 			int s = stream.read(&x, 1);
 			if (s <= 0) { // Device not ready yet
-				ThisThread::sleep_for(100); // Wait for device to come up
+				// Check if aborted
+				if (ThisThread::flags_get() & EQMOUNT_TERMINATE) {
+					ThisThread::flags_clear(EQMOUNT_TERMINATE);
+					// Try to terminate the event queue
+					queue.break_dispatch();
+					// Wait for the remaining task to finish
+					evq_thd.join();
+					delete buffer;
+					return;
+				}
+				ThisThread::sleep_for(100ms); // Wait for device to come up
 				continue;
 			} else if (x == '\r' || x == '\n') { // End of line
 				break;
@@ -157,7 +184,7 @@ void EqMountServer::task_thread() {
 				&EqMountServer::command_execute);
 		while (queue.call(cb, commandlist[cind], argn, args, buffer) == 0) { // Use the event dispatching thread to run this
 			debug_ptg(SVR_DEBUG, "Event queue full. Wait...\r\n");
-			ThisThread::sleep_for(100);
+			ThisThread::sleep_for(100ms);
 		}
 
 		// The buffer and argument list will be deleted when the command finishes execution in the event dispatch thread
