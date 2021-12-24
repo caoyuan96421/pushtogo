@@ -1,7 +1,7 @@
 /*
  * TelescopeConfiguration.h
  *
- *  Created on: 2018Äê3ÔÂ1ÈÕ
+ *  Created on: 2018ï¿½ï¿½3ï¿½ï¿½1ï¿½ï¿½
  *      Author: caoyuan9642
  */
 
@@ -16,7 +16,7 @@
 //#include "nvstore.h"
 //#endif
 
-#include "kvstore.h"
+#include "KVStore.h"
 
 typedef enum {
 	DATATYPE_INT, DATATYPE_DOUBLE, DATATYPE_STRING, DATATYPE_BOOL
