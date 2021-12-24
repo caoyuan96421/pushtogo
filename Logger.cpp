@@ -82,7 +82,8 @@ static void get_log_filename(char *buf, int len, struct tm *tt) {
 static char *trim(char *s)
 {
     char* back = s + strlen(s);
-    while(isspace(*--back));
+    while(back>=s && isspace(*back))
+    	back--;
     *(back+1) = '\0';
     return s;
 }
@@ -90,8 +91,6 @@ static char *trim(char *s)
 static char _buf[128];
 
 void Logger::_vlog(const char *fmt, va_list args, bool error) {
-	if (!fs || !is_initialized)
-		return;
 
 	mutex.lock();
 	File *fp;
@@ -102,9 +101,15 @@ void Logger::_vlog(const char *fmt, va_list args, bool error) {
 	getLocalTime(tnow, &tt);
 	get_log_filename(_buf, sizeof(_buf), &tt);
 
-	fp = new File();
-	if (fp->open(fs, _buf, O_WRONLY | O_APPEND) != 0) {
-		goto failed;
+
+	if (fs && is_initialized){
+		fp = new File();
+		if (fp->open(fs, _buf, O_WRONLY | O_APPEND) != 0) {
+			delete fp;
+			fp = NULL;
+		}
+	} else {
+		fp = NULL;
 	}
 
 	len=snprintf(_buf, sizeof(_buf),"[%02d:%02d:%02d] ", tt.tm_hour, tt.tm_min, tt.tm_sec);
@@ -115,12 +120,17 @@ void Logger::_vlog(const char *fmt, va_list args, bool error) {
 
 	trim(_buf); // Remove tailing white spaces
 
-	fp->write(_buf, len);
-	fp->write("\n", 1);
-	fp->sync();
-
-failed:
-	fp->close();
-	delete fp;
+	if (fp) {
+		fp->write(_buf, len);
+		fp->write("\n", 1);
+		fp->sync();
+		fp->close();
+		delete fp;
+		bd->sync();
+	}
+	else {
+		// Print to screen
+		puts(_buf);
+	}
 	mutex.unlock();
 }

@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "printf.h"
+#include "Logger.h"
 
 #define EQMOUNT_TERMINATE 1
 
@@ -37,12 +38,14 @@ EqMountServer::EqMountServer(FileHandle &stream, bool echo) :
 				NULL, "EqMountServer dispatcher"), echo(echo), queue(
 				16 * EVENTS_EVENT_SIZE) {
 	thread.start(callback(this, &EqMountServer::task_thread));
+	Logger::log("EqMountServer started.");
 }
 
 EqMountServer::~EqMountServer() {
 	// Wait for unfinished commands to finish
 	thread.flags_set(EQMOUNT_TERMINATE);
 	thread.join();
+	Logger::log("EqMountServer stopped.");
 }
 
 void EqMountServer::task_thread() {

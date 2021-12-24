@@ -1,5 +1,6 @@
 #include <math.h>
 #include "EquatorialMount.h"
+#include "Logger.h"
 
 EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 		LocationProvider &loc) :
@@ -8,6 +9,9 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 				PIER_SIDE_EAST), num_alignment_stars(0), pec(ra), thd_monitor(
 				osPriorityBelowNormal, 1024, NULL, "EqMount Monitor") {
 	south = loc.getLatitude() < 0.0;
+
+	Logger::log("Equatorial Mount started.");
+
 	// Set RA and DEC positions to zero if no encoder is installed
 	if (!(ra.getEncoder() && dec.getEncoder())) {
 		ra.setAngleDeg(0);
@@ -25,10 +29,16 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 			&& TelescopeConfiguration::isConfigExist("ra_encoder_offset")) {
 		ra.setEncoderOffset(
 				TelescopeConfiguration::getDouble("ra_encoder_offset"));
+
+		Logger::log("EqMount RA Encoder offset loaded: %.2f.",
+				TelescopeConfiguration::getDouble("ra_encoder_offset"));
 	}
 	if (dec.getEncoder()
 			&& TelescopeConfiguration::isConfigExist("dec_encoder_offset")) {
 		dec.setEncoderOffset(
+				TelescopeConfiguration::getDouble("dec_encoder_offset"));
+
+		Logger::log("EqMount DEC Encoder offset loaded: %.2f.",
 				TelescopeConfiguration::getDouble("dec_encoder_offset"));
 	}
 
@@ -81,6 +91,9 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 		}
 
 		recalibrate();
+
+		Logger::log("EqMount calib %d stars loaded.", num_alignment_stars);
+
 	} else if (TelescopeConfiguration::isConfigExist("calib_off_ra")
 			&& TelescopeConfiguration::isConfigExist("calib_off_dec")
 			&& TelescopeConfiguration::isConfigExist("calib_pa_alt")
@@ -93,8 +106,12 @@ EquatorialMount::EquatorialMount(Axis &ra, Axis &dec, UTCClock &clk,
 				TelescopeConfiguration::getDouble("calib_pa_alt"),
 				TelescopeConfiguration::getDouble("calib_pa_azi"));
 		calibration.cone = TelescopeConfiguration::getDouble("calib_cone");
-	} else {																	// Else use initial calibration
+
+		Logger::log("EqMount calib info loaded.");
+	} else {									// Else use initial calibration
 		calibration.pa = AzimuthalCoordinates(loc.getLatitude(), 0);
+
+		Logger::log("EqMount calib is reset.");
 	}
 
 	// Start in tracking mode
@@ -116,13 +133,18 @@ osStatus EquatorialMount::goTo(EquatorialCoordinates dest) {
 
 	printPosition();
 
+	Logger::log("EqMount goTo EQ RA=%.2f DEC=%.2f.", dest.ra, dest.dec);
+
 	for (int i = 0; i < 2; i++) {
 		// Convert to Mount coordinates. Automatically determine the pier side, then apply offset
 		MountCoordinates dest_mount = convertToMountCoordinates(dest);
 
 		osStatus s = goToMount(dest_mount, (i > 0)); // Use correction only for the second time
-		if (s != osOK)
+		if (s != osOK) {
+
+			Logger::log("EqMount goTo EQ aborted.");
 			return s;
+		}
 	}
 
 	printPosition();
@@ -141,6 +163,8 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 		debug_ptg(EM_DEBUG,
 				"ra limit exceeded at %f (must be in %f to %f).\r\n",
 				dest_mount.ra_delta, -90 - limit, 90 + limit);
+
+		Logger::log("EqMount goTo target exceeds RA limit.");
 		return osErrorParameter;
 	}
 
@@ -154,12 +178,18 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 	} else if (status != MOUNT_STOPPED) {
 		debug_ptg(EM_DEBUG, "goTo requested while mount is not stopped.\r\n");
 		mutex_execution.unlock();
+
+		Logger::logError(
+				"Error: EqMount goTo requested while mount is not stopped.");
 		return osErrorParameter;
 	}
 	debug_ptg(EM_DEBUG, "goTo dstmnt ra=%.2f, dec=%.2f\r\n",
 			dest_mount.ra_delta, dest_mount.dec_delta);
-
 	debug_ptg(EM_DEBUG, "start slewing\r\n");
+
+	Logger::log("EqMount goTo MNT RA=%.2f DEC=%.2f.", dest_mount.ra_delta,
+			dest_mount.dec_delta);
+
 	status = MOUNT_SLEWING;
 	ra.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.ra_delta, withCorrection);
 	dec.startSlewTo(AXIS_ROTATE_CLAMPED, dest_mount.dec_delta, withCorrection);
@@ -179,17 +209,21 @@ osStatus EquatorialMount::goToMount(MountCoordinates dest_mount,
 
 	updatePosition(); // Update current position
 
+	Logger::log("EqMount goTo finished and returned %d.", ret);
 	if (ret) {
 		// Stopped during slew
 		return ret;
-	} else
+	} else {
 		return osOK;
+	}
 }
 
 osStatus EquatorialMount::startTracking() {
 	if (status != MOUNT_STOPPED) {
 		debug_ptg(EM_DEBUG,
 				"tracking requested while mount is not stopped.\r\n");
+		Logger::logError(
+				"Error: EqMount tracking requested while mount is not stopped.");
 		return osErrorParameter;
 	}
 
@@ -200,20 +234,25 @@ osStatus EquatorialMount::startTracking() {
 	sr = ra.startTracking(ra_dir);
 	sd = dec.startTracking(AXIS_ROTATE_STOP);
 	mutex_execution.unlock();
+
 	if (sr != osOK || sd != osOK)
 		return osErrorResource;
-	else
+	else {
+		Logger::log("EqMount start tracking.");
 		return osOK;
+	}
 }
 
 osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 	if (status & MOUNT_SLEWING) // Cannot be nudged in slewing mode
 			{
+		Logger::logError("EqMount nudge requested during slew.");
 		return osErrorParameter;
 	}
 	osStatus s = osOK;
 	mutex_execution.lock();
 	if (newdir == NUDGE_NONE) { // Stop nudging if being nudged
+		Logger::log("EqMount nudge stopped.");
 		if (status & MOUNT_NUDGING) {
 			mountstatus_t oldstatus = status;
 			stopAsync(); // Stop the mount
@@ -226,6 +265,9 @@ osStatus EquatorialMount::startNudge(nudgedir_t newdir) {
 			}
 		}
 	} else { // newdir is not NUDGE_NONE
+		Logger::log("EqMount nudge %c%c.",
+				((newdir & NUDGE_WEST) ? 'W' : (newdir & NUDGE_EAST) ? 'E' : ' '),
+				((newdir & NUDGE_NORTH) ? 'N' : (newdir & NUDGE_SOUTH) ? 'S' : ' '));
 		updatePosition(); // Update current position, because we need to know the current pier side
 		bool ra_changed = false, dec_changed = false;
 		axisrotdir_t ra_dir = AXIS_ROTATE_STOP, dec_dir = AXIS_ROTATE_STOP;
@@ -382,6 +424,8 @@ osStatus EquatorialMount::stopTracking() {
 		status = MOUNT_NUDGING;
 	}
 	mutex_execution.unlock();
+
+	Logger::log("EqMount stopped tracking.");
 	return osOK;
 }
 
@@ -407,12 +451,14 @@ void EquatorialMount::emergencyStop() {
 	dec.emergency_stop();
 	status = MOUNT_STOPPED;
 	curr_nudge_dir = NUDGE_NONE;
+	Logger::log("EqMount emergency stopped.");
 }
 
 void EquatorialMount::stopAsync() {
 	ra.stop();
 	dec.stop();
 	status = MOUNT_STOPPED;
+	Logger::log("EqMount stopped async.");
 }
 
 void EquatorialMount::stopSync() {
@@ -423,6 +469,7 @@ void EquatorialMount::stopSync() {
 		ThisThread::yield();
 	}
 	status = MOUNT_STOPPED;
+	Logger::log("EqMount stopped sync.");
 }
 
 osStatus EquatorialMount::recalibrate() {
@@ -480,7 +527,7 @@ void EquatorialMount::saveCalibration() {
 	// Write number of stars and all star info
 	if (num_alignment_stars > 0)
 		TelescopeConfiguration::setInt("calib_num_stars", num_alignment_stars);
-	else if (TelescopeConfiguration::isConfigExist("calib_num_stars")){
+	else if (TelescopeConfiguration::isConfigExist("calib_num_stars")) {
 		// Remove calib star config if there is no star, so next time it will not be loaded
 		TelescopeConfiguration::removeConfig("calib_num_stars");
 	}
@@ -583,11 +630,14 @@ void EquatorialMount::setSlewSpeed(double rate) {
 	}
 	// Simply update rate for DEC
 	dec.setSlewSpeed(rate);
+
+	Logger::log("EqMount slew speed set to %f.", rate);
 }
 
 void EquatorialMount::setTrackSpeedSidereal(double rate) {
 //	mutex_execution.lock();
 	ra.setTrackSpeedSidereal(rate);
+	Logger::log("EqMount track speed set to %f.", rate);
 //	mutex_execution.unlock();
 }
 
@@ -595,6 +645,8 @@ void EquatorialMount::setGuideSpeedSidereal(double rate) {
 //	mutex_execution.lock();
 	ra.setGuideSpeedSidereal(rate);
 	dec.setGuideSpeedSidereal(rate);
+
+	Logger::log("EqMount guide speed set to %f.", rate);
 //	mutex_execution.unlock();
 }
 
@@ -624,6 +676,7 @@ void EquatorialMount::setEncoderIndex() {
 	TelescopeConfiguration::setDouble("dec_encoder_offset", dec_off);
 
 	TelescopeConfiguration::saveConfig();
+	Logger::log("EqMount encoder index set to current position.");
 }
 
 double EquatorialMount::getTilt() {
@@ -657,6 +710,8 @@ void EquatorialMount::task_monitor() {
 					// Stop motion
 					stopSync();
 					triggered = true;
+
+					Logger::log("EqMount RA limit reached.");
 				}
 			} else {
 				// Reset trigger
@@ -668,7 +723,7 @@ void EquatorialMount::task_monitor() {
 		}
 
 		// Wait
-		ThisThread::sleep_for(100);
+		ThisThread::sleep_for(100ms);
 	}
 }
 
@@ -686,4 +741,7 @@ void EquatorialMount::linkEncoderOffset() {
 	calibration.offset = IndexOffset(0, 0);
 	forceAlignment();
 	recalibrate();
+
+	Logger::log(
+			"EqMount calib offset linked into encoder. All stars forced to align.");
 }

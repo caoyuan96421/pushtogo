@@ -8,6 +8,7 @@
 
 #include "mbed.h"
 #include "TMC2130.h"
+#include "Logger.h"
 #define TMC_DEBUG 1
 
 #define TMC2130_GCONF			0x00
@@ -122,6 +123,19 @@ TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref,
 
 	// Start event queue
 	eq_thread.start(callback(&eq, &EventQueue::dispatch_forever));
+
+	if ((unsigned int) hw_readreg(TMC2130_GCONF) != GCONF_VALUE
+			|| (unsigned int) hw_readreg(TMC2130_CHOPCONF) != CHOPCONF_VALUE){
+		Logger::logError("TMC2130 initialization failed: ");
+	}
+	else{
+
+		Logger::log("TMC2130 initialized successfully. ");
+	}
+
+	Logger::log("GCONF=0x%08x", (unsigned int) hw_readreg(TMC2130_GCONF));
+	Logger::log("DRV_STATUS=0x%08x", (unsigned int) hw_readreg(TMC2130_DRV_STATUS));
+	Logger::log("CHOPCONF=0x%08x", (unsigned int) hw_readreg(TMC2130_CHOPCONF));
 }
 
 TMC2130::~TMC2130() {

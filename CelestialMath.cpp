@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include "mbed.h"
 #include "debug.h"
+#include "EquatorialMount.h"
 
 static inline double clamp(double x) {
 	return (x > 1) ? 1 : ((x < -1) ? -1 : x);
@@ -385,7 +386,7 @@ double alignTwoStars(const AlignmentStar stars[],
 	return residue;
 }
 
-static double jac[20][5]; // can maximally hold 10 stars
+static double jac[MAX_AS_N][5]; // can maximally hold 10 stars
 static double jacjac[5][5]; // J'J
 static double invj[5][5];
 

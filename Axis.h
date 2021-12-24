@@ -262,6 +262,7 @@ protected:
 	Timer tim; /// Timer
 	bool guiding; /// isGuiding
 	double encoder_offset;
+	Mutex encoder_mutex;
 
 	PEC *pec; /// PEC
 	bool pecEnabled; /// Is pec enabled

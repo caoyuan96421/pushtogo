@@ -31,7 +31,7 @@ Axis::Axis(double stepsPerDeg, StepperMotor *stepper, Encoder *encoder,
 	strcat(taskName, " task");
 	/*Start the task-handling thread*/
 	task_thread = new Thread(osPriorityAboveNormal,
-	2048, NULL, taskName);
+	4096, NULL, taskName);
 	task_thread->start(callback(this, &Axis::task));
 	tim.start();
 	// Register error callback
@@ -604,8 +604,10 @@ void Axis::track(axisrotdir_t dir) {
 void Axis::sync_count() {
 	if (!encoder)
 		return;
+	encoder_mutex.lock();
 	double angle = encoder->read();
 	stepper->setStepCount(angle * stepsPerDeg);
+	encoder_mutex.unlock();
 }
 
 void Axis::err_cb() {
@@ -725,7 +727,10 @@ double Axis::getAngleDeg() {
 	if (!encoder)
 		return remainder(stepper->getStepCount() / stepsPerDeg, 360);
 	else {
-		return remainder(encoder->read() - encoder_offset, 360);
+		encoder_mutex.lock();
+		double ang = remainder(encoder->read() - encoder_offset, 360);
+		encoder_mutex.unlock();
+		return ang;
 	}
 }
 

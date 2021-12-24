@@ -26,7 +26,7 @@ struct ServerCommand {
 	}
 };
 
-#define MAX_COMMAND 128
+#define MAX_COMMAND 32
 
 #define ERR_WRONG_NUM_PARAM 1
 #define ERR_PARAM_OUT_OF_RANGE 2
