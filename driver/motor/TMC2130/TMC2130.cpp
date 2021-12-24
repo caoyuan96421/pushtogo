@@ -306,17 +306,17 @@ void TMC2130::err_cb() {
 	if (drv_stat & (1 << 28)) {
 		status = ERROR;
 		error_stop();
-		fprintf(stderr, "TMC2130: Phase B short circuit");
+		error("TMC2130: Phase B short circuit");
 	}
 	if (drv_stat & (1 << 27)) {
 		status = ERROR;
 		error_stop();
-		fprintf(stderr, "TMC2130: Phase A short circuit");
+		error("TMC2130: Phase A short circuit");
 	}
 	if (drv_stat & ((1 << 26) | (1 << 25))) {
 		status = ERROR;
 		error_stop();
-		fprintf(stderr, "TMC2130: Over temperature");
+		error("TMC2130: Over temperature");
 	}
 //	if ((drv_stat & (1 << 24)) && status == STEPPING) {
 //		uint32_t tstep = hw_readreg(TMC2130_TSTEP);
